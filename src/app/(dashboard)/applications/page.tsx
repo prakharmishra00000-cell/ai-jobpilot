@@ -13,6 +13,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
+import { analyzeLiveJobFit } from '@/services/ai/gemini';
 
 interface ApplicationItem {
   id: string;
@@ -47,25 +48,31 @@ export default function ApplicationsPage() {
           }
         }
 
-        // AUTO-POPULATE LIVE JOBS IN CRM BY DEFAULT FROM 15 CONNECTED SOURCES
+        // READ CANDIDATE PROFILE FOR REAL-TIME DYNAMIC FIT SCORING
         const candidateProfile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+        const candidateSkills = candidateProfile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+        const candidateYears = candidateProfile.experienceYears || 1;
         const roleQuery = candidateProfile.targetRole || 'Software Developer';
         
         const liveJobs = await jobSourceRegistry.searchAllSources({ role: roleQuery });
 
-        const defaultLiveApps: ApplicationItem[] = liveJobs.slice(0, 12).map((job, idx) => ({
-          id: `live-app-${job.id || idx}`,
-          jobTitle: job.title,
-          company: job.company,
-          platform: job.source,
-          fitScore: 92 + (idx % 6),
-          shortlistProb: 82 + (idx % 10),
-          appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          status: idx % 3 === 0 ? 'Application Confirmed' : 'Direct Link Active 24/7',
-          responseStatus: idx % 5 === 0 ? 'Reviewing Candidate Profile' : 'No Response Yet',
-          mode: '24/7 Live Engine',
-          originalUrl: job.originalUrl || job.applicationUrl,
-        }));
+        const defaultLiveApps: ApplicationItem[] = liveJobs.slice(0, 12).map((job, idx) => {
+          const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
+
+          return {
+            id: `live-app-${job.id || idx}`,
+            jobTitle: job.title,
+            company: job.company,
+            platform: job.source,
+            fitScore: liveFit.fitScore,
+            shortlistProb: liveFit.shortlistProbability,
+            appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+            status: 'Ready to Apply (Direct Link Active)',
+            responseStatus: 'Awaiting Candidate Action',
+            mode: '24/7 Live Engine',
+            originalUrl: job.originalUrl || job.applicationUrl,
+          };
+        });
 
         setApplications(defaultLiveApps);
         localStorage.setItem('jobpilot_applications', JSON.stringify(defaultLiveApps));
@@ -83,10 +90,10 @@ export default function ApplicationsPage() {
     switch (status) {
       case 'Application Confirmed':
         return 'bg-emerald-950 text-emerald-300 border-emerald-800';
-      case 'Direct Link Active 24/7':
-        return 'bg-indigo-950 text-indigo-300 border-indigo-800';
       case 'Applied':
-        return 'bg-slate-800 text-slate-300 border-slate-700';
+        return 'bg-emerald-950 text-emerald-300 border-emerald-800';
+      case 'Ready to Apply (Direct Link Active)':
+        return 'bg-indigo-950 text-indigo-300 border-indigo-800';
       default:
         return 'bg-slate-800 text-slate-300 border-slate-700';
     }
@@ -120,9 +127,9 @@ export default function ApplicationsPage() {
             className="bg-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 border border-slate-700 focus:outline-none focus:border-indigo-500"
           >
             <option value="All">All Application Statuses</option>
-            <option value="Direct Link Active 24/7">Direct Link Active 24/7</option>
-            <option value="Application Confirmed">Application Confirmed</option>
+            <option value="Ready to Apply (Direct Link Active)">Ready to Apply (Direct Link Active)</option>
             <option value="Applied">Applied</option>
+            <option value="Application Confirmed">Application Confirmed</option>
           </select>
         </div>
 
@@ -145,7 +152,7 @@ export default function ApplicationsPage() {
                   <th className="py-3.5 px-4">Job & Company</th>
                   <th className="py-3.5 px-4">Platform Source</th>
                   <th className="py-3.5 px-4">Fit & Shortlist</th>
-                  <th className="py-3.5 px-4">Applied Date</th>
+                  <th className="py-3.5 px-4">Date Added</th>
                   <th className="py-3.5 px-4">Application Status</th>
                   <th className="py-3.5 px-4">Official Verification Link</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
@@ -166,7 +173,7 @@ export default function ApplicationsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-4">
-                      <div className="font-extrabold text-amber-400">
+                      <div className={`font-extrabold ${app.fitScore >= 80 ? 'text-amber-400' : app.fitScore >= 60 ? 'text-indigo-400' : 'text-rose-400'}`}>
                         {app.fitScore}% FIT
                       </div>
                       <div className="text-[10px] text-slate-400">Prob: {app.shortlistProb}%</div>
@@ -187,7 +194,7 @@ export default function ApplicationsPage() {
                         className="px-2.5 py-1 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 text-[11px] font-semibold inline-flex items-center gap-1 border border-emerald-800/60 transition-colors"
                         title="Verify submission on official platform page"
                       >
-                        <span>🔗 Verify Official Link</span>
+                        <span>🔗 Open & Apply on Platform</span>
                         <ExternalLink className="w-3 h-3 text-emerald-400" />
                       </a>
                     </td>
