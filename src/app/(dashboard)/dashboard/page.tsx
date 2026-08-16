@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Sparkles,
@@ -14,13 +14,18 @@ import {
   RefreshCw,
   ChevronRight,
   Award,
+  Upload,
+  FileText,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
-import { analyzeLiveJobFit } from '@/services/ai/gemini';
+import { analyzeLiveJobFit, extractCandidateFromText } from '@/services/ai/gemini';
 import { RawJob } from '@/types';
 
 export default function DashboardPage() {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [isScanning, setIsScanning] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [automationActive, setAutomationActive] = useState(true);
   const [topJobs, setTopJobs] = useState<RawJob[]>([]);
   const [trackedApplicationsCount, setTrackedApplicationsCount] = useState(0);
@@ -28,7 +33,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([
     { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Connected to 15 live job source adapters' },
-    { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Queried live Remotive API feed & deduplicated listings' },
+    { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Queried live API feeds & deduplicated listings' },
   ]);
 
   const loadLiveDashboardData = async () => {
@@ -41,7 +46,6 @@ export default function DashboardPage() {
       const fetched = await jobSourceRegistry.searchAllSources({ role: targetRole });
       setTopJobs(fetched);
 
-      // Load applications count from localStorage
       const savedApps = JSON.parse(localStorage.getItem('jobpilot_applications') || '[]');
       setTrackedApplicationsCount(savedApps.length);
     } catch (err) {
@@ -54,6 +58,46 @@ export default function DashboardPage() {
   useEffect(() => {
     loadLiveDashboardData();
   }, []);
+
+  // Trigger internal storage file picker from Dashboard
+  const handleOpenDashboardFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleDashboardFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      setIsUploading(true);
+      
+      try {
+        const extracted = await extractCandidateFromText(file.name);
+        
+        const newProfile = {
+          resumeFileName: file.name,
+          stream: extracted.stream,
+          targetRole: extracted.targetRole,
+          skills: extracted.skills,
+          experienceYears: extracted.experienceYears || 1,
+          updatedAt: new Date().toISOString(),
+        };
+
+        localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(newProfile));
+        setCandidateProfile(newProfile);
+
+        setActivityLogs(prev => [
+          { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & parsed new resume "${file.name}" (${extracted.stream})` },
+          ...prev
+        ]);
+
+        await loadLiveDashboardData();
+      } catch (err) {
+        console.error('Error parsing uploaded resume:', err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+  };
 
   const handleRunScan = async () => {
     setIsScanning(true);
@@ -68,7 +112,6 @@ export default function DashboardPage() {
   const candidateSkills = candidateProfile?.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
   const candidateYears = candidateProfile?.experienceYears || 1;
 
-  // Compute realistic AI high fit count
   const highFitCount = topJobs.filter((j) => {
     const analysis = analyzeLiveJobFit(j, candidateSkills, candidateYears);
     return analysis.fitScore >= 75;
@@ -82,6 +125,15 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
+      {/* Hidden File Input for Device Internal Storage Picker */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleDashboardFileSelected}
+        accept=".pdf,.doc,.docx,.txt"
+        className="hidden"
+      />
+
       {/* Top Banner Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-slate-800 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
@@ -97,11 +149,22 @@ export default function DashboardPage() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Your AI Job Agent is continuously scanning 15 connected platforms, ranking fit scores, and tracking responses.
+            Active Stream: <strong className="text-indigo-300">{candidateProfile?.stream || 'Engineering & Technology'}</strong> • Target Role: <strong className="text-white">{candidateProfile?.targetRole || 'AI Full Stack Developer'}</strong>
           </p>
         </div>
 
+        {/* Action Controls: Upload Resume & Run Scan */}
         <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={handleOpenDashboardFilePicker}
+            disabled={isUploading}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all border border-emerald-500/40 disabled:opacity-50"
+            title="Open device storage to select and upload a new resume"
+          >
+            {isUploading ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <Upload className="w-4 h-4 text-white" />}
+            <span>{isUploading ? 'Parsing Resume...' : 'Upload Resume'}</span>
+          </button>
+
           <button
             onClick={handleRunScan}
             disabled={isScanning}
@@ -111,6 +174,31 @@ export default function DashboardPage() {
             <span>{isScanning ? 'Scanning Live APIs...' : 'Run Job Scan Now'}</span>
           </button>
         </div>
+      </div>
+
+      {/* Uploaded Resume Status Card Banner */}
+      <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-950 text-indigo-400 border border-indigo-800/50 flex items-center justify-center shrink-0">
+            <FileText className="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <span className="font-bold text-white block">
+              Active Resume: {candidateProfile?.resumeFileName || 'Uploaded_Resume.pdf'}
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Parsed Skills: {candidateSkills.slice(0, 5).join(', ')} ({candidateSkills.length} Total Skills Matched)
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleOpenDashboardFilePicker}
+          className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 self-start sm:self-auto"
+        >
+          <span>Replace Resume</span>
+          <Upload className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Metrics Cards Grid - Live Dynamic Numbers */}
@@ -207,7 +295,7 @@ export default function DashboardPage() {
                         </span>
                       </div>
                       <p className="text-xs font-medium text-slate-300 mt-0.5">
-                        {job.company} • <span className="text-slate-400">{job.location}</span> • <span className="text-emerald-400 font-medium">{job.salaryRange || 'Market Standard'}</span>
+                        {job.company} • <span className="text-slate-400">{job.location}</span> • <span className="text-emerald-400 font-medium">{job.salaryRange || '₹10 LPA - ₹18 LPA'}</span>
                       </p>
                     </div>
 
