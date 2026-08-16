@@ -8,9 +8,8 @@ import {
   ExternalLink,
   ChevronRight,
   ShieldCheck,
-  Briefcase,
-  Sparkles,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
 import { analyzeLiveJobFit } from '@/services/ai/gemini';
@@ -27,6 +26,7 @@ interface ApplicationItem {
   responseStatus: string;
   mode: string;
   originalUrl: string;
+  isUserSubmitted?: boolean;
 }
 
 export default function ApplicationsPage() {
@@ -34,62 +34,70 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function initLiveApplications() {
-      setIsLoading(true);
-      try {
-        const saved = localStorage.getItem('jobpilot_applications');
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed && parsed.length > 0) {
-            setApplications(parsed);
-            setIsLoading(false);
-            return;
-          }
+  const loadLiveApplications = async () => {
+    setIsLoading(true);
+    try {
+      // CLEAR old cached mock items that had fake 'Applied' statuses
+      const saved = localStorage.getItem('jobpilot_applications');
+      if (saved) {
+        const parsed: ApplicationItem[] = JSON.parse(saved);
+        // Filter out old fake items that claimed 'Applied' without user action
+        const cleanSaved = parsed.filter(a => a.isUserSubmitted || a.status === 'Ready to Apply (Direct Link Active)');
+        if (cleanSaved.length > 0) {
+          setApplications(cleanSaved);
+          setIsLoading(false);
+          return;
         }
-
-        // READ CANDIDATE PROFILE FOR REAL-TIME DYNAMIC FIT SCORING
-        const candidateProfile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
-        const candidateSkills = candidateProfile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
-        const candidateYears = candidateProfile.experienceYears || 1;
-        const roleQuery = candidateProfile.targetRole || 'Software Developer';
-        
-        const liveJobs = await jobSourceRegistry.searchAllSources({ role: roleQuery });
-
-        const defaultLiveApps: ApplicationItem[] = liveJobs.slice(0, 12).map((job, idx) => {
-          const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
-
-          return {
-            id: `live-app-${job.id || idx}`,
-            jobTitle: job.title,
-            company: job.company,
-            platform: job.source,
-            fitScore: liveFit.fitScore,
-            shortlistProb: liveFit.shortlistProbability,
-            appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-            status: 'Ready to Apply (Direct Link Active)',
-            responseStatus: 'Awaiting Candidate Action',
-            mode: '24/7 Live Engine',
-            originalUrl: job.originalUrl || job.applicationUrl,
-          };
-        });
-
-        setApplications(defaultLiveApps);
-        localStorage.setItem('jobpilot_applications', JSON.stringify(defaultLiveApps));
-      } catch (err) {
-        console.error('Error auto-populating live CRM applications:', err);
-      } finally {
-        setIsLoading(false);
       }
-    }
 
-    initLiveApplications();
+      // READ CANDIDATE PROFILE FOR REAL-TIME DYNAMIC FIT SCORING
+      const candidateProfile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+      const candidateSkills = candidateProfile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+      const candidateYears = candidateProfile.experienceYears || 1;
+      const roleQuery = candidateProfile.targetRole || 'Software Developer';
+      
+      const liveJobs = await jobSourceRegistry.searchAllSources({ role: roleQuery });
+
+      const defaultLiveApps: ApplicationItem[] = liveJobs.slice(0, 12).map((job, idx) => {
+        const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
+
+        return {
+          id: `live-app-${job.id || idx}`,
+          jobTitle: job.title,
+          company: job.company,
+          platform: job.source,
+          fitScore: liveFit.fitScore,
+          shortlistProb: liveFit.shortlistProbability,
+          appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          status: 'Ready to Apply (Direct Link Active)',
+          responseStatus: 'Awaiting Candidate Action',
+          mode: '24/7 Live Engine',
+          originalUrl: job.originalUrl || job.applicationUrl,
+          isUserSubmitted: false,
+        };
+      });
+
+      setApplications(defaultLiveApps);
+      localStorage.setItem('jobpilot_applications', JSON.stringify(defaultLiveApps));
+    } catch (err) {
+      console.error('Error loading live CRM applications:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadLiveApplications();
   }, []);
+
+  const handleClearCache = () => {
+    localStorage.removeItem('jobpilot_applications');
+    loadLiveApplications();
+  };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'Application Confirmed':
-        return 'bg-emerald-950 text-emerald-300 border-emerald-800';
       case 'Applied':
         return 'bg-emerald-950 text-emerald-300 border-emerald-800';
       case 'Ready to Apply (Direct Link Active)':
@@ -115,6 +123,15 @@ export default function ApplicationsPage() {
             Real-time tracked jobs from 15 connected platforms with direct official verification links.
           </p>
         </div>
+
+        <button
+          onClick={handleClearCache}
+          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700/60 self-start sm:self-auto"
+          title="Reset cached CRM data and reload fresh live jobs"
+        >
+          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+          <span>Reset CRM Data</span>
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -141,7 +158,7 @@ export default function ApplicationsPage() {
       {/* Applications Table */}
       {isLoading ? (
         <div className="py-16 text-center text-xs text-slate-400 flex items-center justify-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-          <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Fetching live jobs across 15 sources and auto-populating CRM...
+          <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Fetching live jobs across 15 sources and populating CRM...
         </div>
       ) : (
         <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
