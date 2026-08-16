@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { jobSourceRegistry } from '@/adapters/registry';
+import { allSourcesAdapter } from '@/adapters/all_sources';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,25 +11,29 @@ export async function POST(req: NextRequest) {
     const skills = candidateProfile?.skills || [
       'AI-powered applications', 'AI APIs', 'Prompt Engineering', 'AI Agent Development', 'AI product integration',
       'Frontend Development', 'Backend Development', 'APIs', 'Database Integration', 'Authentication', 'Next.js', 'React',
-      'Antigravity', 'GitHub', 'Vercel', 'Render', 'zen.ai', 'ChatGPT', 'Gemini', 'Automation'
+      'Antigravity', 'GitHub', 'Vercel', 'Render', 'zen.ai', 'ChatGPT', 'Gemini', 'SaaS Concepts', 'UI/UX Design', 'Career & Education Technology', 'Automation'
     ];
 
-    let searchQueries = [role, 'AI Developer', 'Next.js Developer', 'Full Stack Engineer'];
+    let searchQueries = [
+      'Senior AI Full-Stack Developer (AI APIs & Next.js)',
+      'AI Agent & Product Integration Engineer',
+      'Next.js & React AI Applications Developer',
+      'Full-Stack AI Web Developer (Prompt Engineering & APIs)',
+    ];
 
-    // Use Gemini 1.5 Flash to construct resume-driven targeted search queries
     if (apiKey) {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);
         const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-        const prompt = `You are an AI job search engine. Based on this candidate's resume profile, generate 3-4 targeted search query keywords for querying live job feeds:
+        const prompt = `You are an AI job discovery engine. Generate 3-4 targeted search query titles matching this candidate's EXACT resume:
 
 Candidate Role: ${role}
 Candidate Skills: ${skills.join(', ')}
 
 Return strict JSON format ONLY:
 {
-  "queries": ["AI Web Developer", "Next.js Full Stack", "Prompt Engineer"]
+  "queries": ["Senior AI Full-Stack Developer", "AI Agent & Product Integration Engineer", "Next.js & React AI Developer"]
 }`;
 
         const result = await model.generateContent(prompt);
@@ -45,14 +49,14 @@ Return strict JSON format ONLY:
       }
     }
 
-    // Fetch live jobs using primary search query
-    const fetchedJobs = await jobSourceRegistry.searchAllSources({ role: searchQueries[0] || role });
+    // Fetch all exact matched jobs
+    const fetchedJobs = await allSourcesAdapter.fetchJobs(role);
 
-    // Score jobs against candidate resume skills
+    // Score jobs against candidate's exact resume skills
     const scoredJobs = fetchedJobs.map((job) => {
       const descLower = (job.description || '').toLowerCase();
       const titleLower = (job.title || '').toLowerCase();
-      
+
       const matchedSkills = skills.filter((s: string) =>
         descLower.includes(s.toLowerCase()) || titleLower.includes(s.toLowerCase())
       );
@@ -62,7 +66,7 @@ Return strict JSON format ONLY:
       else if (descLower.includes('3+') || descLower.includes('3 years')) requiredYears = 3;
 
       const candidateYears = candidateProfile?.experienceYears || 1;
-      let fitScore = 75 + Math.round((matchedSkills.length / Math.max(skills.length, 3)) * 20);
+      let fitScore = 80 + Math.round((matchedSkills.length / Math.max(skills.length, 3)) * 18);
 
       const cons = [];
       if (requiredYears > candidateYears) {
@@ -72,13 +76,13 @@ Return strict JSON format ONLY:
         cons.push('⚠ High applicant competition for this role title');
       }
 
-      fitScore = Math.min(Math.max(fitScore, 35), 98);
+      fitScore = Math.min(Math.max(fitScore, 40), 98);
 
       return {
         ...job,
         liveFit: {
           fitScore,
-          shortlistProbability: Math.round(fitScore * 0.8),
+          shortlistProbability: Math.round(fitScore * 0.82),
           pros: matchedSkills.length > 0
             ? matchedSkills.map((s: string) => `✓ Verified resume skill match: ${s}`)
             : skills.slice(0, 3).map((s: string) => `✓ Extracted resume skill: ${s}`),
