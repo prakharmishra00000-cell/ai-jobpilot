@@ -25,18 +25,18 @@ export default function LandingPage() {
             </span>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors border border-slate-700"
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30"
             >
-              Sign In
+              Launch Dashboard
             </Link>
             <Link
               href="/onboarding"
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30"
+              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors border border-slate-700"
             >
-              Analyze My Portfolio
+              Upload Resume
             </Link>
           </div>
         </div>
@@ -56,7 +56,7 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-base sm:text-lg text-slate-300 max-w-3xl mx-auto leading-relaxed">
-          Find better opportunities, understand your multi-factor AI fit score, personalize every application, and track your entire job search from one intelligent workspace.
+          Find better opportunities across all academic & professional streams, understand your multi-factor AI fit score, personalize every application, and track your entire job search from one intelligent workspace.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
@@ -64,7 +64,7 @@ export default function LandingPage() {
             href="/onboarding"
             className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-xl shadow-indigo-600/30 hover:scale-105"
           >
-            <span>Analyze My Portfolio</span>
+            <span>Setup Resume & Stream</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
@@ -72,7 +72,7 @@ export default function LandingPage() {
             href="/dashboard"
             className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-sm border border-slate-800 transition-all hover:scale-105"
           >
-            Start Job Search Dashboard
+            Launch Dashboard
           </Link>
         </div>
 
