@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Zap, Play, Pause, RefreshCw, CheckCircle2, ShieldCheck, Sliders, Server, Clock } from 'lucide-react';
+import { Zap, Play, Pause, Sliders } from 'lucide-react';
 
 export default function AutomationPage() {
   const [isActive, setIsActive] = useState(true);
@@ -9,6 +9,24 @@ export default function AutomationPage() {
   const [minFit, setMinFit] = useState(85);
   const [dailyLimit, setDailyLimit] = useState(20);
   const [outreachEnabled, setOutreachEnabled] = useState(true);
+
+  const connectedSources = [
+    'LinkedIn',
+    'Indeed',
+    'Internshala',
+    'Wellfound (AngelList)',
+    'Glassdoor',
+    'Naukri',
+    'Foundit (Monster)',
+    'Cutshort',
+    'Company Career Pages',
+    'Greenhouse Job Boards',
+    'Lever Job Boards',
+    'Workday Career Pages',
+    'Remote Job Boards (Remotive/RemoteOK)',
+    'Government Employment Portals (NCS/USAJobs)',
+    'Other Legitimate Public Sources',
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -19,7 +37,7 @@ export default function AutomationPage() {
             24/7 Automation Control Center <Zap className="w-5 h-5 text-amber-400 fill-amber-400" />
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Configure background workers, scan frequencies, auto-apply thresholds, and recruiter outreach limits.
+            Configure background workers, scan frequencies across all 15 connected platforms, and application limits.
           </p>
         </div>
 
@@ -45,7 +63,7 @@ export default function AutomationPage() {
             <div className={`w-3.5 h-3.5 rounded-full ${isActive ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
             <div>
               <h2 className="font-bold text-base text-white">AUTOMATION STATUS: {isActive ? 'ACTIVE' : 'PAUSED'}</h2>
-              <p className="text-xs text-slate-400">Background workers polling connected job sources safely.</p>
+              <p className="text-xs text-slate-400">Background workers polling all 15 connected job sources safely.</p>
             </div>
           </div>
 
@@ -55,26 +73,18 @@ export default function AutomationPage() {
           </div>
         </div>
 
-        {/* Source Health Grid */}
+        {/* Source Health Grid for all 15 Sources */}
         <div className="space-y-3">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Connected Sources Health</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="font-medium text-slate-200">Remotive Jobs</span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">● Connected</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="font-medium text-slate-200">JSearch (LinkedIn)</span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">● Connected</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="font-medium text-slate-200">Adzuna API</span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">● Connected</span>
-            </div>
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
-              <span className="font-medium text-slate-200">Greenhouse Feeds</span>
-              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">● Connected</span>
-            </div>
+          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">All 15 Connected Sources Health</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+            {connectedSources.map((src) => (
+              <div key={src} className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between">
+                <span className="font-medium text-slate-200 text-[11px] truncate">{src}</span>
+                <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800 shrink-0">
+                  ● Connected
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>

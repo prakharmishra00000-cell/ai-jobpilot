@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: jobpilot-ai
+    env: node
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.10.0
+      - key: DATABASE_URL
+        value: file:./dev.db
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JSEARCH_API_KEY
+        sync: false
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false

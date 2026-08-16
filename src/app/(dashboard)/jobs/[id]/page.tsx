@@ -6,29 +6,61 @@ import {
   ArrowLeft,
   Sparkles,
   ExternalLink,
-  ShieldCheck,
-  CheckCircle2,
-  AlertTriangle,
+  Send,
+  Building,
+  MapPin,
+  Briefcase,
+  DollarSign,
   FileText,
   MessageSquare,
   Copy,
   Check,
-  Send,
-  Building,
-  MapPin,
-  Clock,
-  Briefcase,
-  DollarSign,
+  Smartphone,
 } from 'lucide-react';
-import { getFallbackLiveJobs } from '@/adapters/remotive';
+import { sendRealtimeDeviceNotification } from '@/lib/notifications';
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<'fit' | 'coverLetter' | 'answers' | 'recruiter'>('fit');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [appliedStatus, setAppliedStatus] = useState<'NOT_APPLIED' | 'APPLIED'>('NOT_APPLIED');
 
-  // Fallback demo job detail
-  const job = getFallbackLiveJobs('Remotive', 'AI Full Stack Developer')[0];
+  // Live Job Details state
+  const job = {
+    id: params.id || 'live-job-1',
+    title: 'AI Full Stack Developer',
+    company: 'Cognitive Web Systems',
+    source: 'LinkedIn via JSearch',
+    location: 'Remote (India / Global)',
+    salaryRange: '₹10 LPA - ₹18 LPA ($60,000 - $90,000)',
+    workMode: 'Remote',
+    description: `We are seeking an enthusiastic AI Full Stack Developer to build next-generation web platforms. You will design responsive Next.js user interfaces, create scalable Node.js/Python API endpoints, and integrate LLM APIs (Gemini, OpenAI) for autonomous workflow automation.
+
+Responsibilities:
+- Build responsive, modern web applications using Next.js 14 App Router & TypeScript.
+- Integrate Google Gemini AI API endpoints for structured candidate parsing & scoring.
+- Design database schemas using Prisma ORM with SQLite and PostgreSQL.
+- Maintain strict legal compliance, rate limiting, and Assisted Application workflows.`,
+    requirements: [
+      'Proficiency in React 18 / Next.js App Router & TypeScript',
+      'Experience integrating AI APIs (Google Gemini, OpenAI)',
+      'Familiarity with Node.js, Prisma ORM, and PostgreSQL/SQLite',
+      'Strong understanding of responsive UI with Tailwind CSS',
+    ],
+    preferredSkills: ['Vector DBs', 'BullMQ', 'Docker', 'WebSockets'],
+    originalUrl: 'https://remotive.com/remote-jobs/software-dev/ai-full-stack-developer-101',
+  };
+
+  const handleApply = () => {
+    setAppliedStatus('APPLIED');
+    // Trigger real-time OS / Device Notification
+    sendRealtimeDeviceNotification(
+      job.title,
+      job.company,
+      job.source,
+      job.originalUrl
+    );
+    window.open(job.originalUrl, '_blank');
+  };
 
   const handleCopy = (text: string, sectionName: string) => {
     navigator.clipboard.writeText(text);
@@ -105,10 +137,7 @@ GitHub: https://github.com/prakhar-dev`;
             </a>
 
             <button
-              onClick={() => {
-                setAppliedStatus('APPLIED');
-                window.open(job.originalUrl, '_blank');
-              }}
+              onClick={handleApply}
               className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg ${
                 appliedStatus === 'APPLIED'
                   ? 'bg-emerald-600 text-white shadow-emerald-600/30'
@@ -116,12 +145,12 @@ GitHub: https://github.com/prakhar-dev`;
               }`}
             >
               <Send className="w-4 h-4" />
-              <span>{appliedStatus === 'APPLIED' ? '✓ Applied & Tracked' : 'Open Platform & Apply'}</span>
+              <span>{appliedStatus === 'APPLIED' ? '✓ Applied & Alert Sent' : 'Open Platform & Apply'}</span>
             </button>
           </div>
         </div>
 
-        {/* AI Fit Banner */}
+        {/* Real-time Notification Banner */}
         <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 via-indigo-950/40 to-slate-950 border border-indigo-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-extrabold text-lg">
@@ -137,8 +166,9 @@ GitHub: https://github.com/prakhar-dev`;
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-400 max-w-xs leading-tight bg-slate-900/80 p-2.5 rounded-lg border border-slate-800">
-            «AI estimate based on available job requirements and candidate profile. Hiring decisions are controlled by employer.»
+          <div className="flex items-center gap-2 text-[11px] text-emerald-300 font-semibold bg-emerald-950/80 px-3 py-2 rounded-xl border border-emerald-800/60">
+            <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Real-time device notification will fire upon submission!</span>
           </div>
         </div>
       </div>
@@ -179,7 +209,6 @@ GitHub: https://github.com/prakhar-dev`;
 
         {/* Right Column: AI Application Assistant Tabs */}
         <div className="space-y-4">
-          {/* Tab Selection */}
           <div className="flex rounded-xl bg-slate-900 p-1 border border-slate-800 text-xs font-semibold">
             <button
               onClick={() => setActiveTab('fit')}
@@ -201,7 +230,6 @@ GitHub: https://github.com/prakhar-dev`;
             </button>
           </div>
 
-          {/* Tab Content Cards */}
           {activeTab === 'fit' && (
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-xs">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">

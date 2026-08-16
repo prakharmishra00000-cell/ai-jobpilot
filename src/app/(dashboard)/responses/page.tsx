@@ -1,76 +1,95 @@
 'use client';
 
-import React from 'react';
-import { MessageSquare, Sparkles, CheckCircle2, Calendar, Mail, ArrowUpRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import {
+  MessageSquare,
+  Sparkles,
+  Inbox,
+  ArrowRight,
+} from 'lucide-react';
+
+interface ResponseItem {
+  id: string;
+  company: string;
+  jobTitle: string;
+  sender: string;
+  type: string;
+  sentiment: string;
+  date: string;
+  summary: string;
+  recommendedAction: string;
+  originalUrl: string;
+}
 
 export default function ResponsesPage() {
-  const responses = [
-    {
-      id: 'res-1',
-      company: 'HyperScale AI',
-      jobTitle: 'Frontend AI Web Developer',
-      type: 'Interview Invitation',
-      confidence: 96,
-      date: '14 Aug 2026, 6:42 PM',
-      snippet: 'Hi Prakhar, thank you for submitting your application for the Frontend AI Web Developer role! We were impressed by your JobPilot AI project and would love to invite you for a 30-minute technical interview.',
-      actionText: 'Schedule Technical Interview',
-    },
-    {
-      id: 'res-2',
-      company: 'Apex Data Labs',
-      jobTitle: 'Junior Software Engineer',
-      type: 'Technical Assessment Received',
-      confidence: 92,
-      date: '12 Aug 2026, 3:15 PM',
-      snippet: 'Hi Prakhar, please find attached the link to our online coding assessment (React + Next.js). Please complete it within 48 hours.',
-      actionText: 'Open Coding Assessment',
-    },
-  ];
+  const [responses, setResponses] = useState<ResponseItem[]>([]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('jobpilot_responses');
+    if (saved) {
+      try {
+        setResponses(JSON.parse(saved));
+      } catch (e) {
+        setResponses([]);
+      }
+    } else {
+      setResponses([]);
+    }
+  }, []);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            Employer & Recruiter Responses <MessageSquare className="w-5 h-5 text-emerald-400" />
+            Employer Responses & AI Classifier <MessageSquare className="w-5 h-5 text-indigo-400" />
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            AI classifies incoming communication (Interview Requests, Assessments, Confirmations).
+            Real-time classification of incoming emails, recruiter outreach, and interview invitations.
           </p>
         </div>
       </div>
 
-      <div className="space-y-4">
-        {responses.map((res) => (
-          <div key={res.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 shadow-lg">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded border border-emerald-800">
-                    🎯 {res.type}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">Confidence: {res.confidence}%</span>
-                </div>
-                <h3 className="font-bold text-base text-white mt-1">{res.company}</h3>
-                <p className="text-xs text-slate-400">{res.jobTitle}</p>
-              </div>
-
-              <span className="text-xs text-slate-400 font-mono">{res.date}</span>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-sans">
-              "{res.snippet}"
-            </div>
-
-            <div className="flex justify-end">
-              <button className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30">
-                <span>{res.actionText}</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+      {/* Responses List or Authentic Empty State */}
+      {responses.length === 0 ? (
+        <div className="p-12 text-center bg-slate-900/90 border border-slate-800 rounded-2xl space-y-4 shadow-xl">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-950 text-indigo-400 border border-indigo-800/50 flex items-center justify-center mx-auto">
+            <Inbox className="w-6 h-6" />
           </div>
-        ))}
-      </div>
+          <div className="space-y-1">
+            <h3 className="font-bold text-base text-white">No Responses Detected Yet</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Once you submit job applications, incoming recruiter replies, interview invitations, and status updates will be automatically parsed, classified, and shown here in real-time.
+            </p>
+          </div>
+          <Link
+            href="/jobs"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-all shadow-md shadow-indigo-600/30"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Discover & Apply to Jobs</span>
+          </Link>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {responses.map((item) => (
+            <div key={item.id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3 shadow-lg">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-base text-white">{item.company} — {item.jobTitle}</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">From: {item.sender} • {item.date}</p>
+                </div>
+                <span className="px-2.5 py-1 rounded-full bg-emerald-950 text-emerald-300 font-bold text-[10px] border border-emerald-800">
+                  {item.type}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">{item.summary}</p>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

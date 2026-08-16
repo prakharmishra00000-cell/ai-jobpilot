@@ -3,14 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Briefcase, FileCheck, Zap, User } from 'lucide-react';
+import { LayoutDashboard, Briefcase, FileCheck, Zap, BookOpen } from 'lucide-react';
 
 const mobileNavItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
   { name: 'CRM', href: '/applications', icon: FileCheck },
   { name: 'Auto', href: '/automation', icon: Zap },
-  { name: 'Profile', href: '/profile', icon: User },
+  { name: 'Guide', href: '/guide', icon: BookOpen },
 ];
 
 export default function MobileNav() {
