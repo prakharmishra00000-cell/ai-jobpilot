@@ -14,11 +14,8 @@ export interface LiveFitAnalysis {
   applicationQA: { q: string; a: string }[];
 }
 
-/**
- * Universal Stream Candidate Profile (Supports B.Com, B.A, BBA, B.Tech, B.Sc, MBA, Law, Entry Level)
- */
 export interface CandidateProfileData {
-  stream: string; // 'Engineering' | 'Finance/Commerce' | 'Arts/Content' | 'Business/Management' | 'Science' | 'General'
+  stream: string;
   targetRole: string;
   skills: string[];
   experienceYears: number;
@@ -28,10 +25,6 @@ export interface CandidateProfileData {
   githubUrl?: string;
 }
 
-/**
- * 100% Universal Stream AI Job Fit Scoring & Pros/Cons Analyzer
- * Evaluates candidates from ANY stream (Commerce, Arts, Science, Engineering, Business, Law, etc.)
- */
 export function analyzeLiveJobFit(
   job: RawJob,
   candidateSkills: string[] = ['Communication', 'Data Analysis', 'Project Management', 'Problem Solving'],
@@ -44,7 +37,6 @@ export function analyzeLiveJobFit(
   const reqs = job.requirements || [];
   const expString = (job.experienceRequired || '').toLowerCase();
 
-  // Parse required years of experience from job text
   let requiredYears = 1;
   if (descLower.includes('5+') || descLower.includes('5 years') || descLower.includes('5-7 years') || expString.includes('5+')) {
     requiredYears = 5;
@@ -54,7 +46,6 @@ export function analyzeLiveJobFit(
     requiredYears = 7;
   }
 
-  // 1. Calculate Pros (Matched Skills & Stream Alignment)
   const pros: string[] = [];
   candidateSkills.forEach((skill) => {
     if (
@@ -74,10 +65,7 @@ export function analyzeLiveJobFit(
     pros.push('✓ Work mode match: Remote flexibility supported');
   }
 
-  // 2. Calculate Cons (Missing Skills & Experience Penalty)
   const cons: string[] = [];
-  
-  // Severe Experience Gap Penalty
   if (requiredYears > candidateYearsOfExp) {
     const gap = requiredYears - candidateYearsOfExp;
     cons.push(`❌ Experience Gap: Job requires ${requiredYears}+ years, candidate resume has ${candidateYearsOfExp} year (-${gap * 15}% penalty)`);
@@ -89,11 +77,9 @@ export function analyzeLiveJobFit(
     cons.push('⚠ High competitive applicant volume for this role title');
   }
 
-  // 3. Compute Real-Time Dynamic Fit Score (0-100%)
   const matchRatio = candidateSkills.length > 0 ? (pros.length / Math.max(candidateSkills.length, 3)) : 0.75;
   let baseScore = 75 + Math.round(matchRatio * 20);
 
-  // Apply experience penalty
   if (requiredYears > candidateYearsOfExp) {
     const gap = requiredYears - candidateYearsOfExp;
     baseScore -= gap * 15;
@@ -102,7 +88,6 @@ export function analyzeLiveJobFit(
   const fitScore = Math.min(Math.max(baseScore, 35), 98);
   const shortlistProbability = Math.round(fitScore * 0.80);
 
-  // 4. Generate Stream-Specific Cover Letter
   const customCoverLetter = `Dear Hiring Manager at ${job.company},
 
 I am writing to express my enthusiasm for the ${job.title} role (${job.source}). Having a background in ${candidateStream} with core strengths in ${candidateSkills.slice(0, 3).join(', ')}, I am confident in my ability to deliver immediate value to ${job.company}.
@@ -113,7 +98,6 @@ Sincerely,
 Prakhar Sharma
 Portfolio / Profile: https://prakhar-portfolio.dev`;
 
-  // 5. Generate Stream-Specific Application QA
   const applicationQA = [
     {
       q: `Why do you want to join ${job.company}?`,
@@ -137,45 +121,76 @@ Portfolio / Profile: https://prakhar-portfolio.dev`;
 
 /**
  * Universal Stream AI Resume Extractor
- * Automatically identifies stream: Commerce, Arts, Engineering, Management, Science, Law, etc.
+ * Uses strict word boundary regex to avoid false HR/BBA matches from filenames like 'prakhar.pdf' or 'sharma.pdf'!
  */
 export async function extractCandidateFromText(rawText: string): Promise<CandidateProfileData> {
-  const textLower = rawText.toLowerCase();
+  const text = rawText || '';
 
-  let stream = 'General';
-  let targetRole = 'Business Associate';
-  let skills: string[] = ['Communication', 'Microsoft Excel', 'Data Analysis', 'Project Management'];
-
-  if (textLower.includes('b.com') || textLower.includes('m.com') || textLower.includes('accounting') || textLower.includes('finance') || textLower.includes('tally')) {
-    stream = 'Finance & Commerce';
-    targetRole = 'Financial Analyst / Accountant';
-    skills = ['Financial Modeling', 'Tally Prime', 'Microsoft Excel (Advanced)', 'GST & Taxation', 'Financial Reporting', 'Accounting'];
-  } else if (textLower.includes('bba') || textLower.includes('mba') || textLower.includes('marketing') || textLower.includes('human resource') || textLower.includes('hr')) {
-    stream = 'Business & Management';
-    targetRole = textLower.includes('hr') ? 'HR Executive' : 'Marketing & Business Analyst';
-    skills = ['Market Research', 'Digital Marketing', 'CRM Systems', 'Talent Acquisition', 'Strategic Planning', 'Data Analytics'];
-  } else if (textLower.includes('b.a') || textLower.includes('m.a') || textLower.includes('english') || textLower.includes('content') || textLower.includes('journalism') || textLower.includes('design')) {
-    stream = 'Arts, Humanities & Design';
-    targetRole = textLower.includes('design') ? 'UI/UX Graphic Designer' : 'Content Strategist & Writer';
-    skills = ['Content Writing', 'Copywriting', 'SEO Optimization', 'Graphic Design (Figma/Adobe)', 'Social Media Management', 'Public Relations'];
-  } else if (textLower.includes('b.tech') || textLower.includes('b.e') || textLower.includes('bca') || textLower.includes('mca') || textLower.includes('computer science') || textLower.includes('developer')) {
-    stream = 'Engineering & Technology';
-    targetRole = 'AI Full Stack Developer';
-    skills = ['React 18', 'Next.js App Router', 'TypeScript', 'Node.js', 'Google Gemini API', 'Prisma ORM', 'Tailwind CSS'];
-  } else if (textLower.includes('b.sc') || textLower.includes('m.sc') || textLower.includes('biology') || textLower.includes('chemistry') || textLower.includes('physics')) {
-    stream = 'Sciences & Research';
-    targetRole = 'Data Analyst / Research Associate';
-    skills = ['Data Analysis (Python/R)', 'Statistical Analysis', 'Laboratory Protocols', 'Research Documentation', 'Excel & SQL'];
-  } else if (textLower.includes('law') || textLower.includes('llb') || textLower.includes('legal')) {
-    stream = 'Legal Studies';
-    targetRole = 'Legal Associate / Contract Specialist';
-    skills = ['Contract Drafting', 'Legal Research', 'Regulatory Compliance', 'Corporate Law', 'Negotiation'];
+  // 1. Engineering & Technology
+  if (/\b(b\.?tech|b\.?e|bca|mca|computer science|software|developer|frontend|backend|fullstack|full stack|react|next\.?js|node|python|java|coder|engineer)\b/i.test(text)) {
+    return {
+      stream: 'Engineering & Technology',
+      targetRole: 'AI Full Stack Developer',
+      skills: ['React 18', 'Next.js App Router', 'TypeScript', 'Node.js', 'Google Gemini API', 'Prisma ORM', 'Tailwind CSS'],
+      experienceYears: 1,
+    };
   }
 
+  // 2. Finance & Commerce (B.Com / M.Com)
+  if (/\b(b\.?com|m\.?com|accounting|accountant|finance|financial|tally|gst|taxation|audit)\b/i.test(text)) {
+    return {
+      stream: 'Finance, Commerce & Accounting',
+      targetRole: 'Financial Analyst / Accountant',
+      skills: ['Financial Modeling', 'Tally Prime', 'Microsoft Excel (Advanced)', 'GST & Taxation', 'Financial Reporting', 'Accounting'],
+      experienceYears: 1,
+    };
+  }
+
+  // 3. Business & Management (BBA / MBA / HR / Marketing)
+  if (/\b(bba|mba|marketing|management|\bhr\b|human resources?|recruiter|talent acquisition)\b/i.test(text)) {
+    return {
+      stream: 'Business, Management & HR',
+      targetRole: /\b(hr|human resources?|recruiter)\b/i.test(text) ? 'HR Executive' : 'Marketing & Business Analyst',
+      skills: ['Market Research', 'Digital Marketing', 'CRM Systems', 'Talent Acquisition', 'Strategic Planning', 'Data Analytics'],
+      experienceYears: 1,
+    };
+  }
+
+  // 4. Arts, Content & Design (B.A / M.A / Design)
+  if (/\b(b\.?a|m\.?a|english|content|writer|copywriter|journalism|design|graphic|figma|ui\/ux)\b/i.test(text)) {
+    return {
+      stream: 'Arts, Content & Design',
+      targetRole: /\bdesign\b/i.test(text) ? 'UI/UX Graphic Designer' : 'Content Strategist & Writer',
+      skills: ['Content Writing', 'Copywriting', 'SEO Optimization', 'Graphic Design (Figma)', 'Social Media Management', 'Public Relations'],
+      experienceYears: 1,
+    };
+  }
+
+  // 5. Sciences & Data (B.Sc / M.Sc)
+  if (/\b(b\.?sc|m\.?sc|biology|chemistry|physics|science|biotech|research)\b/i.test(text)) {
+    return {
+      stream: 'Sciences & Data',
+      targetRole: 'Data Analyst / Research Associate',
+      skills: ['Data Analysis (Python/SQL)', 'Statistical Analysis', 'Laboratory Protocols', 'Research Documentation', 'Excel & SQL'],
+      experienceYears: 1,
+    };
+  }
+
+  // 6. Legal & General
+  if (/\b(law|llb|legal|advocate|attorney)\b/i.test(text)) {
+    return {
+      stream: 'Legal & Compliance',
+      targetRole: 'Legal Associate / Contract Specialist',
+      skills: ['Contract Drafting', 'Legal Research', 'Regulatory Compliance', 'Corporate Law', 'Negotiation'],
+      experienceYears: 1,
+    };
+  }
+
+  // Default fallback if no keyword matches -> Default to Engineering & Technology (instead of BBA/HR!)
   return {
-    stream,
-    targetRole,
-    skills,
+    stream: 'Engineering & Technology',
+    targetRole: 'Software Developer',
+    skills: ['React', 'Next.js', 'TypeScript', 'Node.js', 'Problem Solving'],
     experienceYears: 1,
   };
 }
