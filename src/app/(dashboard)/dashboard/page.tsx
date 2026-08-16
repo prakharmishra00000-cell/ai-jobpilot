@@ -42,7 +42,7 @@ export default function DashboardPage() {
       const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
       setCandidateProfile(profile);
 
-      const targetRole = profile.targetRole || 'AI Full Stack Developer';
+      const targetRole = profile.targetRole || 'Software Developer';
       const fetched = await jobSourceRegistry.searchAllSources({ role: targetRole });
       setTopJobs(fetched);
 
@@ -59,43 +59,48 @@ export default function DashboardPage() {
     loadLiveDashboardData();
   }, []);
 
-  // Trigger internal storage file picker from Dashboard
   const handleOpenDashboardFilePicker = () => {
     fileInputRef.current?.click();
   };
 
-  const handleDashboardFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDashboardFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
       setIsUploading(true);
       
-      try {
-        const extracted = await extractCandidateFromText(file.name);
-        
-        const newProfile = {
-          resumeFileName: file.name,
-          stream: extracted.stream,
-          targetRole: extracted.targetRole,
-          skills: extracted.skills,
-          experienceYears: extracted.experienceYears || 1,
-          updatedAt: new Date().toISOString(),
-        };
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        try {
+          const fileContent = (event.target?.result as string) || file.name;
+          const extracted = await extractCandidateFromText(`${file.name}\n${fileContent}`);
+          
+          const newProfile = {
+            resumeFileName: file.name,
+            stream: extracted.stream,
+            targetRole: extracted.targetRole,
+            skills: extracted.skills,
+            experienceYears: extracted.experienceYears || 1,
+            updatedAt: new Date().toISOString(),
+          };
 
-        localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(newProfile));
-        setCandidateProfile(newProfile);
+          localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(newProfile));
+          setCandidateProfile(newProfile);
 
-        setActivityLogs(prev => [
-          { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & parsed new resume "${file.name}" (${extracted.stream})` },
-          ...prev
-        ]);
+          setActivityLogs(prev => [
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & parsed resume "${file.name}" for "${extracted.targetRole}"` },
+            ...prev
+          ]);
 
-        await loadLiveDashboardData();
-      } catch (err) {
-        console.error('Error parsing uploaded resume:', err);
-      } finally {
-        setIsUploading(false);
-      }
+          await loadLiveDashboardData();
+        } catch (err) {
+          console.error('Error parsing uploaded resume:', err);
+        } finally {
+          setIsUploading(false);
+        }
+      };
+
+      reader.readAsText(file);
     }
   };
 
@@ -149,7 +154,7 @@ export default function DashboardPage() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Active Stream: <strong className="text-indigo-300">{candidateProfile?.stream || 'Engineering & Technology'}</strong> • Target Role: <strong className="text-white">{candidateProfile?.targetRole || 'AI Full Stack Developer'}</strong>
+            Active Role: <strong className="text-indigo-300">{candidateProfile?.targetRole || 'Software Developer'}</strong> • Stream: <strong className="text-white">{candidateProfile?.stream || 'Professional'}</strong>
           </p>
         </div>
 
@@ -162,7 +167,7 @@ export default function DashboardPage() {
             title="Open device storage to select and upload a new resume"
           >
             {isUploading ? <RefreshCw className="w-4 h-4 animate-spin text-white" /> : <Upload className="w-4 h-4 text-white" />}
-            <span>{isUploading ? 'Parsing Resume...' : 'Upload Resume'}</span>
+            <span>{isUploading ? 'Reading Resume...' : 'Upload Resume'}</span>
           </button>
 
           <button
@@ -184,10 +189,10 @@ export default function DashboardPage() {
           </div>
           <div>
             <span className="font-bold text-white block">
-              Active Resume: {candidateProfile?.resumeFileName || 'Uploaded_Resume.pdf'}
+              Active Resume: {candidateProfile?.resumeFileName || 'Uploaded_Resume.pdf'} ({candidateProfile?.targetRole || 'Software Developer'})
             </span>
             <span className="text-[11px] text-slate-400">
-              Parsed Skills: {candidateSkills.slice(0, 5).join(', ')} ({candidateSkills.length} Total Skills Matched)
+              Extracted Skills: {candidateSkills.slice(0, 5).join(', ')} ({candidateSkills.length} Total Skills Matched)
             </span>
           </div>
         </div>
@@ -257,7 +262,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              🔥 TOP OPPORTUNITIES <span className="text-xs font-mono text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800/50">Live API Listings</span>
+              🔥 TOP OPPORTUNITIES FOR {candidateProfile?.targetRole ? candidateProfile.targetRole.toUpperCase() : 'YOU'} <span className="text-xs font-mono text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800/50">Live API Listings</span>
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">Live opportunities evaluated by multi-factor score and shortlist probability</p>
           </div>
