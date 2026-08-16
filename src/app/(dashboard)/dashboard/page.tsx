@@ -16,6 +16,7 @@ import {
   Award,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
+import { analyzeLiveJobFit } from '@/services/ai/gemini';
 import { RawJob } from '@/types';
 
 export default function DashboardPage() {
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [automationActive, setAutomationActive] = useState(true);
   const [topJobs, setTopJobs] = useState<RawJob[]>([]);
   const [trackedApplicationsCount, setTrackedApplicationsCount] = useState(0);
+  const [candidateProfile, setCandidateProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([
     { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Connected to 15 live job source adapters' },
@@ -32,7 +34,11 @@ export default function DashboardPage() {
   const loadLiveDashboardData = async () => {
     setIsLoading(true);
     try {
-      const fetched = await jobSourceRegistry.searchAllSources({ role: 'AI Full Stack Developer' });
+      const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+      setCandidateProfile(profile);
+
+      const targetRole = profile.targetRole || 'AI Full Stack Developer';
+      const fetched = await jobSourceRegistry.searchAllSources({ role: targetRole });
       setTopJobs(fetched);
 
       // Load applications count from localStorage
@@ -59,12 +65,20 @@ export default function DashboardPage() {
     setIsScanning(false);
   };
 
+  const candidateSkills = candidateProfile?.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+  const candidateYears = candidateProfile?.experienceYears || 1;
+
   // Compute realistic AI high fit count
-  const highFitCount = topJobs.filter((j, idx) => {
-    const desc = (j.description || '').toLowerCase();
-    const title = (j.title || '').toLowerCase();
-    return idx % 4 === 0 || desc.includes('react') || desc.includes('ai') || title.includes('full stack');
+  const highFitCount = topJobs.filter((j) => {
+    const analysis = analyzeLiveJobFit(j, candidateSkills, candidateYears);
+    return analysis.fitScore >= 75;
   }).length;
+
+  const getFitBadgeStyle = (score: number) => {
+    if (score >= 80) return 'text-amber-400 border-amber-500/30 bg-amber-500/10';
+    if (score >= 60) return 'text-indigo-400 border-indigo-500/30 bg-indigo-500/10';
+    return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -124,7 +138,7 @@ export default function DashboardPage() {
           <p className="text-2xl sm:text-3xl font-extrabold text-amber-400 mt-2">
             {isLoading ? '...' : highFitCount}
           </p>
-          <p className="text-[11px] text-slate-400 mt-1">AI fit score &gt;= 80%</p>
+          <p className="text-[11px] text-slate-400 mt-1">AI fit score &gt;= 75%</p>
         </div>
 
         {/* Card 3: Applications Tracked */}
@@ -174,68 +188,72 @@ export default function DashboardPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {topJobs.slice(0, 5).map((job, idx) => (
-              <div
-                key={`${job.id}-${idx}`}
-                className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-4 group shadow-md"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-base text-white group-hover:text-indigo-300 transition-colors">
-                        {job.title}
-                      </h3>
-                      <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                        {job.source}
-                      </span>
-                    </div>
-                    <p className="text-xs font-medium text-slate-300 mt-0.5">
-                      {job.company} • <span className="text-slate-400">{job.location}</span> • <span className="text-emerald-400 font-medium">{job.salaryRange || 'Market Standard'}</span>
-                    </p>
-                  </div>
+            {topJobs.slice(0, 5).map((job, idx) => {
+              const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <div className="text-sm font-extrabold text-amber-400 flex items-center gap-1 justify-end">
-                        <Sparkles className="w-3.5 h-3.5" /> 94% FIT
+              return (
+                <div
+                  key={`${job.id}-${idx}`}
+                  className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-4 group shadow-md"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-white group-hover:text-indigo-300 transition-colors">
+                          {job.title}
+                        </h3>
+                        <span className="text-[10px] font-mono font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                          {job.source}
+                        </span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-medium">Shortlist Prob: 78%</p>
+                      <p className="text-xs font-medium text-slate-300 mt-0.5">
+                        {job.company} • <span className="text-slate-400">{job.location}</span> • <span className="text-emerald-400 font-medium">{job.salaryRange || 'Market Standard'}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <div className={`text-xs font-extrabold px-2 py-0.5 rounded-lg border inline-flex items-center gap-1 ${getFitBadgeStyle(liveFit.fitScore)}`}>
+                          <Sparkles className="w-3.5 h-3.5" /> {liveFit.fitScore}% FIT
+                        </div>
+                        <p className="text-[10px] text-slate-400 font-medium mt-0.5">Shortlist: {liveFit.shortlistProbability}%</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                    {job.description}
+                  </p>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> Live Feed Listing
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={job.originalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700/60"
+                      >
+                        <span>View Original</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+
+                      <Link
+                        href={`/jobs/${job.id}`}
+                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30"
+                      >
+                        <span>Analyze & Apply</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </Link>
                     </div>
                   </div>
                 </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                  {job.description}
-                </p>
-
-                {/* Actions */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> Live Feed Listing
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={job.originalUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700/60"
-                    >
-                      <span>View Original</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-
-                    <Link
-                      href={`/jobs/${job.id}`}
-                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30"
-                    >
-                      <span>Analyze & Apply</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -261,7 +279,7 @@ export default function DashboardPage() {
 
             <div className="space-y-1">
               <div className="flex justify-between font-semibold text-slate-300">
-                <span>Shortlisted (Fit &gt; 80%)</span>
+                <span>Shortlisted (Fit &gt; 75%)</span>
                 <span>{highFitCount}</span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-2">

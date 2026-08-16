@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
+import { analyzeLiveJobFit } from '@/services/ai/gemini';
 import { RawJob } from '@/types';
 
 export default function JobsPage() {
@@ -23,6 +24,7 @@ export default function JobsPage() {
   const [sourceFilter, setSourceFilter] = useState('All');
   const [jobs, setJobs] = useState<RawJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [candidateProfile, setCandidateProfile] = useState<any>(null);
 
   const sourcesList = [
     'LinkedIn',
@@ -43,14 +45,16 @@ export default function JobsPage() {
   ];
 
   useEffect(() => {
+    // Read uploaded candidate resume profile
+    const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+    setCandidateProfile(profile);
+
     async function loadLiveJobs() {
       setIsLoading(true);
       try {
-        // Query live jobs with auto-fallback to guarantee live results
         const roleQuery = searchTerm.trim() || 'software developer';
         let fetched = await jobSourceRegistry.searchAllSources({ role: roleQuery });
         
-        // If exact phrase returned 0, search broader developer query
         if (fetched.length === 0) {
           fetched = await jobSourceRegistry.searchAllSources({ role: 'developer' });
         }
@@ -66,6 +70,9 @@ export default function JobsPage() {
     loadLiveJobs();
   }, [searchTerm]);
 
+  const candidateSkills = candidateProfile?.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+  const candidateYears = candidateProfile?.experienceYears || 1;
+
   const filteredJobs = jobs.filter((job) => {
     const term = searchTerm.toLowerCase();
     const matchesSearch =
@@ -80,8 +87,13 @@ export default function JobsPage() {
     return matchesSearch && matchesMode && matchesSource;
   });
 
-  // Fallback list if specific filter is too restrictive
   const displayJobs = filteredJobs.length > 0 ? filteredJobs : jobs;
+
+  const getFitBadgeStyle = (score: number) => {
+    if (score >= 80) return 'text-amber-400 border-amber-500/30 bg-amber-500/10';
+    if (score >= 60) return 'text-indigo-400 border-indigo-500/30 bg-indigo-500/10';
+    return 'text-rose-400 border-rose-500/30 bg-rose-500/10';
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -92,7 +104,7 @@ export default function JobsPage() {
             Discovered Jobs Engine <span className="text-xs text-indigo-400 bg-indigo-950 font-mono px-2 py-0.5 rounded border border-indigo-800/50">15 Connected Sources</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time deduplicated job listings from 15 connected platforms, scored by AI fit & shortlist probability.
+            Real-time deduplicated job listings from 15 connected platforms, scored dynamically by experience & resume skills.
           </p>
         </div>
       </div>
@@ -160,73 +172,92 @@ export default function JobsPage() {
             No live jobs matching "{searchTerm}". Click <button onClick={() => setSearchTerm('Software Developer')} className="text-indigo-400 font-semibold underline">here</button> to view all live developer opportunities.
           </div>
         ) : (
-          displayJobs.slice(0, 15).map((job, idx) => (
-            <div
-              key={`${job.id}-${idx}`}
-              className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-4 shadow-lg group"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-base text-white group-hover:text-indigo-300 transition-colors">
-                      {job.title}
-                    </h3>
-                    <span className="text-[10px] font-mono font-semibold text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800/50">
-                      {job.source}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300 mt-1 font-medium">
-                    <span className="text-white font-semibold">{job.company}</span>
-                    <span>•</span>
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {job.location}</span>
-                    <span>•</span>
-                    <span className="text-emerald-400 font-semibold">{job.salaryRange}</span>
-                  </div>
-                </div>
+          displayJobs.slice(0, 15).map((job, idx) => {
+            // Real-Time Dynamic Fit Analysis per job
+            const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
 
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="text-right">
-                    <div className="text-sm font-extrabold text-amber-400 flex items-center gap-1 justify-end">
-                      <Sparkles className="w-3.5 h-3.5" /> 94% FIT
+            return (
+              <div
+                key={`${job.id}-${idx}`}
+                className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-4 shadow-lg group"
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-base text-white group-hover:text-indigo-300 transition-colors">
+                        {job.title}
+                      </h3>
+                      <span className="text-[10px] font-mono font-semibold text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800/50">
+                        {job.source}
+                      </span>
                     </div>
-                    <p className="text-[10px] text-slate-400 font-medium">Shortlist Estimate: High (78%)</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300 mt-1 font-medium">
+                      <span className="text-white font-semibold">{job.company}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {job.location}</span>
+                      <span>•</span>
+                      <span className="text-emerald-400 font-semibold">{job.salaryRange}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <div className="text-right">
+                      <div className={`text-xs font-extrabold px-2.5 py-1 rounded-lg border inline-flex items-center gap-1 ${getFitBadgeStyle(liveFit.fitScore)}`}>
+                        <Sparkles className="w-3.5 h-3.5" /> {liveFit.fitScore}% FIT
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-medium mt-0.5">Shortlist: {liveFit.shortlistProbability}%</p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
+                  {job.description}
+                </p>
+
+                {/* Pros/Cons Summary preview */}
+                <div className="flex flex-wrap gap-2 text-[11px]">
+                  {liveFit.pros.slice(0, 2).map((p, i) => (
+                    <span key={i} className="text-emerald-300 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
+                      {p}
+                    </span>
+                  ))}
+                  {liveFit.cons.slice(0, 1).map((c, i) => (
+                    <span key={i} className={`px-2 py-0.5 rounded border ${c.includes('❌') ? 'text-rose-300 bg-rose-950/60 border-rose-800/50 font-semibold' : 'text-amber-300 bg-amber-950/60 border-amber-800/50'}`}>
+                      {c}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Live Feed</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1 text-emerald-400 font-medium"><ShieldCheck className="w-3 h-3" /> Safety: 96/100</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={job.originalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
+                    >
+                      <span>Original Job</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+
+                    <Link
+                      href={`/jobs/${job.id}`}
+                      className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30"
+                    >
+                      <span>View Details & Prepare</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
               </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                {job.description}
-              </p>
-
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
-                <div className="flex items-center gap-3 text-[11px] text-slate-400">
-                  <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Live Feed</span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 text-emerald-400 font-medium"><ShieldCheck className="w-3 h-3" /> Safety: 96/100</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <a
-                    href={job.originalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-colors border border-slate-700"
-                  >
-                    <span>Original Job</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-
-                  <Link
-                    href={`/jobs/${job.id}`}
-                    className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-md shadow-indigo-600/30"
-                  >
-                    <span>View Details & Prepare</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
