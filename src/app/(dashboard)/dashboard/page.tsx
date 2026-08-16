@@ -19,7 +19,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
-import { analyzeLiveJobFit, extractCandidateFromText } from '@/services/ai/gemini';
+import { analyzeLiveJobFit, extractCandidateFromText, EXACT_PRAKHAR_RESUME_SKILLS } from '@/services/ai/gemini';
 import { RawJob } from '@/types';
 
 export default function DashboardPage() {
@@ -38,23 +38,18 @@ export default function DashboardPage() {
     { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Extracted exact resume technical skills for Prakhar Mishra' },
   ]);
 
-  const defaultPrakharSkills = [
-    'AI-powered applications', 'AI APIs', 'Prompt Engineering', 'AI Agent Development', 'AI product integration',
-    'Frontend Development', 'Backend Development', 'APIs', 'Database Integration', 'Authentication', 'Next.js', 'React',
-    'Antigravity', 'GitHub', 'Vercel', 'Render', 'zen.ai', 'ChatGPT', 'Gemini', 'SaaS Concepts', 'UI/UX Design', 'Automation'
-  ];
-
   const loadLiveDashboardData = async () => {
     setIsLoading(true);
     try {
       let profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || 'null');
       
-      if (!profile || !profile.skills || profile.skills.length === 0 || profile.skills.includes('Prisma ORM')) {
+      // PURGE WRONG CACHED SKILLS (such as Prisma ORM or generic TypeScript) AND OVERWRITE WITH EXACT RESUME SKILLS
+      if (!profile || !profile.skills || profile.skills.includes('Prisma ORM') || !profile.skills.includes('AI-powered applications')) {
         profile = {
           name: 'Prakhar Mishra',
-          stream: 'B.Tech Mechanical Engineering / AI Software Development',
+          stream: 'B.Tech Mechanical Engineering',
           targetRole: 'AI FULL-STACK WEB DEVELOPER',
-          skills: defaultPrakharSkills,
+          skills: EXACT_PRAKHAR_RESUME_SKILLS,
           experienceYears: 1,
           resumeFileName: 'Prakhar_Mishra_Resume.pdf',
           portfolioUrl: 'https://prakhar-portfolio.dev',
@@ -112,7 +107,7 @@ export default function DashboardPage() {
             resumeFileName: file.name,
             stream: extracted.stream || 'B.Tech Mechanical Engineering',
             targetRole: extracted.targetRole || 'AI FULL-STACK WEB DEVELOPER',
-            skills: extracted.skills && extracted.skills.length > 0 ? extracted.skills : defaultPrakharSkills,
+            skills: extracted.skills && extracted.skills.length > 0 ? extracted.skills : EXACT_PRAKHAR_RESUME_SKILLS,
             experienceYears: extracted.experienceYears || 1,
             updatedAt: new Date().toISOString(),
           };
@@ -121,7 +116,7 @@ export default function DashboardPage() {
           setCandidateProfile(newProfile);
 
           setActivityLogs(prev => [
-            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & verified resume "${file.name}" -> ${newProfile.skills.length} skills extracted` },
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & verified resume "${file.name}" -> ${newProfile.skills.length} exact skills extracted` },
             ...prev
           ]);
 
@@ -147,7 +142,7 @@ export default function DashboardPage() {
     setIsScanning(false);
   };
 
-  const candidateSkills = candidateProfile?.skills || defaultPrakharSkills;
+  const candidateSkills = candidateProfile?.skills || EXACT_PRAKHAR_RESUME_SKILLS;
   const candidateYears = candidateProfile?.experienceYears || 1;
 
   const highFitCount = topJobs.filter((j) => {
