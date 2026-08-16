@@ -16,6 +16,7 @@ import {
   Award,
   Upload,
   FileText,
+  AlertTriangle,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
 import { analyzeLiveJobFit, extractCandidateFromText } from '@/services/ai/gemini';
@@ -26,6 +27,7 @@ export default function DashboardPage() {
 
   const [isScanning, setIsScanning] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [automationActive, setAutomationActive] = useState(true);
   const [topJobs, setTopJobs] = useState<RawJob[]>([]);
   const [trackedApplicationsCount, setTrackedApplicationsCount] = useState(0);
@@ -91,6 +93,7 @@ export default function DashboardPage() {
     if (files && files.length > 0) {
       const file = files[0];
       setIsUploading(true);
+      setValidationError(null);
       
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -98,6 +101,12 @@ export default function DashboardPage() {
           const fileContent = (event.target?.result as string) || file.name;
           const extracted = await extractCandidateFromText(`${file.name}\n${fileContent}`);
           
+          if (extracted.isValidResume === false) {
+            setValidationError(extracted.validationError || '❌ Non-Resume File Detected: The uploaded document does not contain resume sections. Please upload a valid resume.');
+            setIsUploading(false);
+            return;
+          }
+
           const newProfile = {
             name: extracted.name || 'Prakhar Mishra',
             resumeFileName: file.name,
@@ -112,7 +121,7 @@ export default function DashboardPage() {
           setCandidateProfile(newProfile);
 
           setActivityLogs(prev => [
-            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & parsed resume "${file.name}" -> ${newProfile.skills.length} exact skills extracted` },
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & verified resume "${file.name}" -> ${newProfile.skills.length} skills extracted` },
             ...prev
           ]);
 
@@ -204,6 +213,22 @@ export default function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* Validation Error Banner */}
+      {validationError && (
+        <div className="p-4 rounded-xl bg-rose-950/80 border border-rose-800/80 flex items-center justify-between text-xs text-rose-200">
+          <div className="flex items-center gap-2 font-bold text-rose-300">
+            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            <span>{validationError}</span>
+          </div>
+          <button
+            onClick={handleOpenDashboardFilePicker}
+            className="px-3 py-1 rounded-lg bg-rose-900 hover:bg-rose-800 text-white text-[11px] font-bold border border-rose-700"
+          >
+            Upload Valid Resume
+          </button>
+        </div>
+      )}
 
       {/* Uploaded Resume Status Card Banner */}
       <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3 text-xs text-slate-300">

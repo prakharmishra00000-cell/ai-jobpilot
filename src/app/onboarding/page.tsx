@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, Upload, CheckCircle2, FileText, RefreshCw, GraduationCap } from 'lucide-react';
+import { Sparkles, ArrowRight, Upload, CheckCircle2, FileText, RefreshCw, GraduationCap, AlertTriangle } from 'lucide-react';
 import BackButton from '@/components/ui/back-button';
 import { extractCandidateFromText } from '@/services/ai/gemini';
 
@@ -13,6 +13,7 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState(1);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const [candidateName, setCandidateName] = useState('Prakhar Mishra');
   const [stream, setStream] = useState('B.Tech Mechanical Engineering');
   const [portfolioUrl, setPortfolioUrl] = useState('');
@@ -35,12 +36,19 @@ export default function OnboardingPage() {
     if (files && files.length > 0) {
       const selected = files[0];
       setResumeFile(selected);
+      setValidationError(null);
 
       const reader = new FileReader();
       reader.onload = async (event) => {
         const fileContent = (event.target?.result as string) || selected.name;
         const extracted = await extractCandidateFromText(`${selected.name}\n${fileContent}`);
         
+        if (extracted.isValidResume === false) {
+          setValidationError(extracted.validationError || '❌ Invalid Document Detected: Please upload a valid resume containing skills or work experience.');
+          setResumeFile(null);
+          return;
+        }
+
         setCandidateName(extracted.name || 'Prakhar Mishra');
         setTargetRole(extracted.targetRole || 'AI FULL-STACK WEB DEVELOPER');
         setStream(extracted.stream || 'B.Tech Mechanical Engineering');
@@ -96,10 +104,10 @@ export default function OnboardingPage() {
         {/* Top Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950 text-indigo-300 text-xs font-semibold border border-indigo-800/50">
-            <GraduationCap className="w-3.5 h-3.5 text-amber-400" /> Resume Skill & Target Role Parsing Engine
+            <GraduationCap className="w-3.5 h-3.5 text-amber-400" /> Resume Skill & Document Validation Engine
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Candidate Profile Setup</h1>
-          <p className="text-xs text-slate-400">Step {step} of 3 — AI extracts exact technical skills & projects directly from your resume.</p>
+          <p className="text-xs text-slate-400">Step {step} of 3 — AI validates your resume document and extracts technical skills.</p>
         </div>
 
         {/* Card */}
@@ -132,11 +140,22 @@ export default function OnboardingPage() {
                       Click to Open Device Storage & Select Resume (PDF/DOCX/TXT)
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      Reads exact resume content & extracts technical skills, AI APIs, Next.js, and projects
+                      Validates document authenticity & extracts technical skills and project experience
                     </p>
                   </div>
                 )}
               </div>
+
+              {/* Document Validation Error Banner */}
+              {validationError && (
+                <div className="p-4 rounded-xl bg-rose-950/80 border border-rose-800/80 space-y-1 text-rose-200">
+                  <div className="flex items-center gap-2 font-bold text-rose-300 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <span>Non-Resume Document Detected</span>
+                  </div>
+                  <p className="text-[11px] text-rose-300/90 leading-relaxed">{validationError}</p>
+                </div>
+              )}
 
               {/* Extracted Resume Details */}
               <div className="p-4 rounded-xl bg-indigo-950/60 border border-indigo-800/60 space-y-2">

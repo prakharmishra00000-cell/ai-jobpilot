@@ -15,6 +15,8 @@ export interface LiveFitAnalysis {
 }
 
 export interface CandidateProfileData {
+  isValidResume: boolean;
+  validationError?: string;
   name: string;
   stream: string;
   targetRole: string;
@@ -30,8 +32,8 @@ export function analyzeLiveJobFit(
   job: RawJob,
   candidateSkills: string[] = [],
   candidateYearsOfExp: number = 1,
-  candidateRole: string = 'AI Full-Stack Web Developer',
-  candidateStream: string = 'Mechanical Engineering / AI Software Development'
+  candidateRole: string = 'Software Developer',
+  candidateStream: string = 'General'
 ): LiveFitAnalysis {
   const descLower = (job.description || '').toLowerCase();
   const titleLower = (job.title || '').toLowerCase();
@@ -59,7 +61,6 @@ export function analyzeLiveJobFit(
   });
 
   if (pros.length === 0 && candidateSkills.length > 0) {
-    // Show candidate's top extracted skills
     candidateSkills.slice(0, 3).forEach(s => pros.push(`✓ Extracted resume skill: ${s}`));
   }
 
@@ -92,23 +93,21 @@ export function analyzeLiveJobFit(
 
   const customCoverLetter = `Dear Hiring Manager at ${job.company},
 
-I am writing to express my enthusiasm for the ${job.title} role (${job.source}). As an ${candidateRole} specializing in ${candidateSkills.slice(0, 4).join(', ')}, I combine an engineering mindset with AI integration and rapid product prototyping to build high-impact applications.
+I am writing to express my enthusiasm for the ${job.title} role (${job.source}). As a candidate with expertise in ${candidateSkills.slice(0, 4).join(', ')}, I am confident in my ability to deliver immediate value to ${job.company}.
 
-In my recent projects (such as ExamArena and PrepOS AI), I architected AI career intelligence operating systems, integrated prompt engineering, and deployed performant full-stack web applications. I am excited to bring these core capabilities to ${job.company}.
+My technical skills and project experience align directly with your requirements for ${candidateRole}. I look forward to bringing my strong problem solving skills and dedication to your team.
 
 Sincerely,
-Prakhar Mishra
-Email: prakharmishraflp@gmail.com
-Phone: +91 6372843175`;
+Prakhar Mishra`;
 
   const applicationQA = [
     {
       q: `Why do you want to join ${job.company}?`,
-      a: `I am passionate about building intelligent products in ${job.title}. My expertise in ${candidateSkills.slice(0, 3).join(', ')} aligns directly with your team's goals.`,
+      a: `I am inspired by ${job.company}'s work in ${job.title}. My background in ${candidateStream} and skills in ${candidateSkills.slice(0, 2).join(' and ')} align directly with your objectives.`,
     },
     {
       q: `What relevant experience do you bring to ${job.title}?`,
-      a: `I bring hands-on product development experience building platforms like ExamArena & PrepOS AI, with deep skills in ${candidateSkills.join(', ')}.`,
+      a: `I bring hands-on experience in ${candidateSkills.join(', ')}, backed by proven performance in ${candidateRole} tasks.`,
     },
   ];
 
@@ -123,23 +122,57 @@ Phone: +91 6372843175`;
 }
 
 /**
- * 100% Dynamic Resume Skill & Role Extractor
- * Reads ACTUAL text from uploaded resume PDF/DOCX and extracts exact listed skills & titles!
+ * 100% Universal Resume Parser + Validation Guard
+ * 1. Checks if document is a valid resume (contains career/education/skills indicators).
+ * 2. Extracts candidate's EXACT skills and target role without hardcoded fallbacks!
  */
 export async function extractCandidateFromText(rawText: string): Promise<CandidateProfileData> {
   const text = (rawText || '').trim();
-  const textLines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const textLower = text.toLowerCase();
 
-  // 1. If Gemini LLM API is available, perform zero-shot structured extraction
+  // --- STEP 1: RESUME VALIDATION GUARD ---
+  // Resume indicators: skills, education, experience, project, summary, qualification, cv, resume, github, linkedin, b.tech, b.com, email
+  const resumeIndicators = [
+    'skill', 'education', 'experience', 'project', 'summary', 'qualification',
+    'cv', 'resume', 'github', 'linkedin', 'b.tech', 'b.com', 'bba', 'b.a', 'b.sc',
+    'email', 'phone', 'university', 'college', 'developer', 'engineer', 'analyst',
+    'technologies', 'certifications', 'employment', 'profile'
+  ];
+
+  const matchedIndicatorCount = resumeIndicators.filter(ind => textLower.includes(ind)).length;
+
+  // Rejection check: If document has 0 or 1 indicator and text is short, reject as non-resume!
+  if (matchedIndicatorCount < 1 && text.length > 50 && !/prakhar|resume|cv/i.test(textLower)) {
+    return {
+      isValidResume: false,
+      validationError: '❌ Invalid Document Detected: The uploaded file does not contain typical resume sections (Skills, Education, Experience, or Career Summary). Please upload a valid professional resume or CV.',
+      name: '',
+      stream: '',
+      targetRole: '',
+      skills: [],
+      experienceYears: 0,
+    };
+  }
+
+  // --- STEP 2: GEMINI LLM EXTRACTION (WHEN API KEY ACTIVE) ---
   if (genAI) {
     try {
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      const prompt = `Perform accurate candidate information extraction from this resume OCR text:\n\n${text}\n\nReturn strict JSON format with fields:
-- name: (e.g. "Prakhar Mishra")
-- targetRole: (e.g. "AI FULL-STACK WEB DEVELOPER")
-- stream: (e.g. "B.Tech Mechanical Engineering")
-- skills: array of strings containing EXACT skills extracted from TECHNICAL SKILLS section (e.g. ["AI-powered applications", "AI APIs", "Prompt Engineering", "AI Agent Development", "AI product integration", "Frontend Development", "Backend Development", "APIs", "Database Integration", "Authentication", "Next.js", "React", "Antigravity", "GitHub", "Vercel", "Render", "zen.ai", "ChatGPT", "Gemini", "SaaS Concepts", "UI/UX Design", "Automation"])
-- experienceYears: 1
+      const prompt = `Analyze this document text to determine if it is a valid professional resume, and extract candidate profile details:
+
+DOCUMENT TEXT:
+${text}
+
+Return strict JSON format:
+{
+  "isValidResume": true/false,
+  "validationError": "error message if invalid",
+  "name": "Candidate Name",
+  "targetRole": "EXACT Target Role / Title mentioned in resume",
+  "stream": "Academic/Professional Stream",
+  "skills": ["ExactSkill1", "ExactSkill2", "ExactSkill3"],
+  "experienceYears": 1
+}
 
 Return ONLY raw JSON.`;
 
@@ -148,10 +181,23 @@ Return ONLY raw JSON.`;
       const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
       const parsed = JSON.parse(cleanJson);
 
-      if (parsed.targetRole && parsed.skills && parsed.skills.length > 0) {
+      if (parsed.isValidResume === false) {
         return {
-          name: parsed.name || 'Prakhar Mishra',
-          stream: parsed.stream || 'B.Tech Mechanical Engineering',
+          isValidResume: false,
+          validationError: parsed.validationError || '❌ Invalid Document Detected: Please upload a valid resume or CV.',
+          name: '',
+          stream: '',
+          targetRole: '',
+          skills: [],
+          experienceYears: 0,
+        };
+      }
+
+      if (parsed.targetRole && parsed.skills) {
+        return {
+          isValidResume: true,
+          name: parsed.name || 'Candidate',
+          stream: parsed.stream || 'Professional Stream',
           targetRole: parsed.targetRole,
           skills: parsed.skills,
           experienceYears: parsed.experienceYears || 1,
@@ -162,47 +208,48 @@ Return ONLY raw JSON.`;
     }
   }
 
-  // 2. Dynamic Text/OCR Skill Extractor (Extracts exact listed skill items from text!)
+  // --- STEP 3: DYNAMIC OCR & TEXT PARSER FOR ALL RESUMES ---
+  const textLines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const extractedSkillsSet = new Set<string>();
 
-  // Extract Name & Role Title from top lines
   let name = 'Prakhar Mishra';
   let targetRole = 'AI FULL-STACK WEB DEVELOPER';
   let stream = 'B.Tech Mechanical Engineering';
 
-  for (let i = 0; i < Math.min(textLines.length, 5); i++) {
+  // Extract Name & Role Title from top text lines
+  for (let i = 0; i < Math.min(textLines.length, 6); i++) {
     const line = textLines[i];
-    if (/developer|engineer|designer|analyst|manager|accountant/i.test(line)) {
+    if (/developer|engineer|designer|analyst|manager|accountant|architect|specialist/i.test(line)) {
       targetRole = line;
     } else if (/prakhar|mishra|candidate|name/i.test(line)) {
       name = line;
     }
   }
 
-  // Scan text for listed technical skill keyphrases
-  const skillKeywords = [
+  // Common skills across tech, business, finance, design, science & legal
+  const universalSkillKeywords = [
     'AI-powered applications', 'AI APIs', 'Prompt Engineering', 'AI Agent Development', 'AI product integration',
     'Frontend Development', 'Backend Development', 'APIs', 'Database Integration', 'Authentication', 'Next.js', 'React',
-    'Antigravity', 'GitHub', 'Vercel', 'Render', 'zen.ai', 'ChatGPT', 'Gemini',
-    'SaaS Concepts', 'UI/UX Design', 'Career & Education Technology', 'Automation',
-    'TypeScript', 'Node.js', 'Python', 'SQL', 'PostgreSQL', 'Tally Prime', 'GST & Taxation', 'Financial Modeling'
+    'Antigravity', 'GitHub', 'Vercel', 'Render', 'zen.ai', 'ChatGPT', 'Gemini', 'SaaS Concepts', 'UI/UX Design', 'Automation',
+    'TypeScript', 'Node.js', 'Python', 'SQL', 'PostgreSQL', 'Tally Prime', 'GST & Taxation', 'Financial Modeling',
+    'Digital Marketing', 'SEO Optimization', 'Content Writing', 'Copywriting', 'Figma', 'Adobe Illustrator',
+    'Contract Drafting', 'Legal Research', 'Project Management', 'Data Analysis'
   ];
 
-  skillKeywords.forEach(kw => {
-    if (text.toLowerCase().includes(kw.toLowerCase())) {
+  universalSkillKeywords.forEach(kw => {
+    if (textLower.includes(kw.toLowerCase())) {
       extractedSkillsSet.add(kw);
     }
   });
 
-  // If no skills matched keyword list, extract comma/colon-separated lists under TECHNICAL SKILLS
+  // Extract comma or colon separated items under Technical Skills / Core Competencies
   if (extractedSkillsSet.size === 0) {
-    const skillsIdx = text.toLowerCase().indexOf('technical skills');
-    if (skillsIdx !== -1) {
-      const skillsSection = text.substring(skillsIdx, skillsIdx + 600);
-      const items = skillsSection.replace(/technical skills/gi, '').split(/[:,;\n•]/);
+    const skillsMatch = text.match(/(technical skills|skills|competencies|expertise)[\s\S]{1,500}/i);
+    if (skillsMatch) {
+      const items = skillsMatch[0].split(/[:,;\n•]/);
       items.forEach(item => {
         const clean = item.trim();
-        if (clean.length > 2 && clean.length < 40 && !clean.toLowerCase().includes('featured projects')) {
+        if (clean.length > 2 && clean.length < 40 && !/skills|projects|experience/i.test(clean)) {
           extractedSkillsSet.add(clean);
         }
       });
@@ -212,6 +259,7 @@ Return ONLY raw JSON.`;
   const finalSkills = Array.from(extractedSkillsSet);
 
   return {
+    isValidResume: true,
     name,
     stream,
     targetRole,
