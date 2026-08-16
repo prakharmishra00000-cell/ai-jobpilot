@@ -6,14 +6,8 @@ services:
     startCommand: npm run start
     envVars:
       - key: NODE_VERSION
-        value: 20.10.0
+        value: 20.19.0
       - key: DATABASE_URL
         value: file:./dev.db
       - key: GEMINI_API_KEY
-        sync: false
-      - key: JSEARCH_API_KEY
-        sync: false
-      - key: ADZUNA_APP_ID
-        sync: false
-      - key: ADZUNA_APP_KEY
         sync: false
