@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Settings, Sliders, ShieldCheck, Save, Link as LinkIcon, CheckCircle2 } from 'lucide-react';
+import { Settings, Sliders, ShieldCheck, Save, Link as LinkIcon } from 'lucide-react';
 
 export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [targetRoles, setTargetRoles] = useState('AI Full Stack Developer, Full Stack Engineer, Frontend AI Developer');
   const [locations, setLocations] = useState('India, Remote, Bengaluru, Delhi NCR, Worldwide Remote');
-  const [salary, setSalary] = useState('₹6 LPA+ ($60,000+ USD)');
+  const [salary, setSalary] = useState('₹8 LPA - ₹25 LPA');
   const [experience, setExperience] = useState('Fresher / 0-1 years');
   const [verifyLinkEnabled, setVerifyLinkEnabled] = useState(true);
   const [notifyOnApply, setNotifyOnApply] = useState(true);
@@ -63,7 +63,7 @@ export default function SettingsPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <label className="font-semibold text-slate-200 block">Minimum Target Salary</label>
+              <label className="font-semibold text-slate-200 block">Minimum Target Salary (₹ LPA)</label>
               <input
                 type="text"
                 value={salary}
@@ -88,7 +88,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* NEW SETTING: Application Verification Links */}
+        {/* Application Verification Links */}
         <div className="pt-4 border-t border-slate-800 space-y-4">
           <h2 className="font-bold text-sm text-white flex items-center gap-2">
             <LinkIcon className="w-4 h-4 text-emerald-400" /> Application Link Verification & Notifications

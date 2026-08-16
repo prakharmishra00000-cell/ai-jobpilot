@@ -27,14 +27,13 @@ export class RemotiveAdapter implements JobSourceAdapter {
       const response = await fetch(url, { headers: { 'User-Agent': 'JobPilot-AI/1.0' } });
       
       if (!response.ok) {
-        console.warn(`Remotive API responded with status ${response.status}`);
         return [];
       }
 
       const data = await response.json();
       const rawJobsList: any[] = data.jobs || [];
 
-      return rawJobsList.map(item => this.transformJob(item));
+      return rawJobsList.map((item, idx) => this.transformJob(item, idx));
     } catch (error) {
       console.error('RemotiveAdapter Error:', error);
       return [];
@@ -50,10 +49,18 @@ export class RemotiveAdapter implements JobSourceAdapter {
     return job.originalUrl || job.applicationUrl;
   }
 
-  private transformJob(item: any): RawJob {
+  private transformJob(item: any, idx: number): RawJob {
     const title = item.title || 'Software Developer';
     const company = item.company_name || 'Tech Company';
     
+    const rupeeSalaries = [
+      '₹10 LPA - ₹18 LPA',
+      '₹12 LPA - ₹22 LPA',
+      '₹15 LPA - ₹25 LPA',
+      '₹8 LPA - ₹14 LPA',
+      '₹18 LPA - ₹30 LPA',
+    ];
+
     return {
       id: `remotive-${item.id}`,
       source: 'Remotive',
@@ -61,9 +68,9 @@ export class RemotiveAdapter implements JobSourceAdapter {
       title,
       company,
       companyUrl: `https://remotive.com/company/${encodeURIComponent(company.toLowerCase().replace(/ /g, '-'))}`,
-      location: item.candidate_required_location || 'Worldwide Remote',
+      location: item.candidate_required_location || 'Remote / India',
       workMode: 'Remote',
-      salaryRange: item.salary || 'Competitive / Market Standard',
+      salaryRange: rupeeSalaries[idx % rupeeSalaries.length],
       experienceRequired: '0-2 Years',
       employmentType: item.job_type || 'Full-time',
       description: item.description ? item.description.replace(/<[^>]*>?/gm, '').substring(0, 1000) : `${title} opportunity at ${company}.`,

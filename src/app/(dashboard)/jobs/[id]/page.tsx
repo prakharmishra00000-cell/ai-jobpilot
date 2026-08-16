@@ -16,7 +16,6 @@ import {
   Copy,
   Check,
   Smartphone,
-  AlertTriangle,
 } from 'lucide-react';
 import { sendRealtimeDeviceNotification } from '@/lib/notifications';
 import { analyzeLiveJobFit, LiveFitAnalysis } from '@/services/ai/gemini';
@@ -28,7 +27,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [appliedStatus, setAppliedStatus] = useState<'NOT_APPLIED' | 'APPLIED'>('NOT_APPLIED');
   const [analysis, setAnalysis] = useState<LiveFitAnalysis | null>(null);
 
-  // Live Job Details
+  // Live Job Details (Salary strictly in Rupees ₹ LPA)
   const job: RawJob = {
     id: params.id || 'live-job-1',
     title: 'AI Full Stack Developer',
@@ -36,7 +35,7 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     source: 'LinkedIn via JSearch',
     externalJobId: params.id || 'ext-101',
     location: 'Remote (India / Global)',
-    salaryRange: '₹10 LPA - ₹18 LPA ($60,000 - $90,000)',
+    salaryRange: '₹10 LPA - ₹18 LPA',
     workMode: 'Remote',
     experienceRequired: '0-2 Years',
     employmentType: 'Full-time',

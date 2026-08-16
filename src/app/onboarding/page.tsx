@@ -56,6 +56,7 @@ export default function OnboardingPage() {
         githubUrl: githubUrl || 'https://github.com/candidate',
         targetRole,
         skills,
+        experienceYears: 1,
         updatedAt: new Date().toISOString(),
       };
       localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(candidateProfile));
@@ -228,7 +229,7 @@ export default function OnboardingPage() {
 
                   <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
                     <span className="text-slate-400 text-[11px] block">Minimum Target Salary</span>
-                    <span className="font-bold text-emerald-400">₹6 LPA+ ($60k+)</span>
+                    <span className="font-bold text-emerald-400">₹6 LPA - ₹18 LPA</span>
                   </div>
                 </div>
               </div>
