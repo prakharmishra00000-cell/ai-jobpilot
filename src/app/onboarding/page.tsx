@@ -3,8 +3,9 @@
 import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, Upload, CheckCircle2, FileText, RefreshCw } from 'lucide-react';
+import { Sparkles, ArrowRight, Upload, CheckCircle2, FileText, RefreshCw, GraduationCap } from 'lucide-react';
 import BackButton from '@/components/ui/back-button';
+import { extractCandidateFromText } from '@/services/ai/gemini';
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState(1);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [stream, setStream] = useState('Engineering & Technology');
   const [portfolioUrl, setPortfolioUrl] = useState('');
   const [linkedinUrl, setLinkedinUrl] = useState('');
   const [githubUrl, setGithubUrl] = useState('');
@@ -19,25 +21,39 @@ export default function OnboardingPage() {
   const [extractedSkills, setExtractedSkills] = useState<string[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Trigger internal storage file picker when user clicks upload area
+  const streamsList = [
+    { name: 'Engineering & Technology', role: 'AI Full Stack Developer', defaultSkills: ['React', 'Next.js', 'Node.js', 'TypeScript', 'AI APIs'] },
+    { name: 'Finance, Commerce & Accounting (B.Com/M.Com)', role: 'Financial Analyst / Accountant', defaultSkills: ['Financial Modeling', 'Tally Prime', 'Advanced Excel', 'GST Taxation', 'Accounting'] },
+    { name: 'Business, Management & HR (BBA/MBA)', role: 'Marketing & HR Executive', defaultSkills: ['Digital Marketing', 'CRM Systems', 'Talent Acquisition', 'Market Research', 'Analytics'] },
+    { name: 'Arts, Content & Design (B.A/M.A/Design)', role: 'Content Strategist / Graphic Designer', defaultSkills: ['Content Writing', 'Copywriting', 'SEO Optimization', 'Figma / Design', 'Social Media'] },
+    { name: 'Sciences & Data (B.Sc/M.Sc)', role: 'Data Analyst / Research Associate', defaultSkills: ['Data Analysis (Python/SQL)', 'Research Methods', 'Excel Analytics', 'Documentation'] },
+    { name: 'Legal & General Graduates (Law/BA)', role: 'Legal Associate / Customer Success', defaultSkills: ['Contract Review', 'Legal Research', 'Client Communications', 'Problem Solving'] },
+  ];
+
   const handleOpenFilePicker = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleStreamChange = (streamName: string) => {
+    const found = streamsList.find(s => s.name === streamName);
+    if (found) {
+      setStream(found.name);
+      setTargetRole(found.role);
+      setExtractedSkills(found.defaultSkills);
+    }
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const selected = files[0];
       setResumeFile(selected);
-      // Auto-extract candidate title from filename
-      const baseName = selected.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
-      if (baseName.toLowerCase().includes('frontend')) {
-        setTargetRole('Frontend AI Developer');
-      } else if (baseName.toLowerCase().includes('backend')) {
-        setTargetRole('Backend Engineer');
-      } else {
-        setTargetRole('AI Full Stack Developer');
-      }
+      
+      // Auto-extract candidate stream & skills based on filename or text
+      const extracted = await extractCandidateFromText(selected.name);
+      setStream(extracted.stream);
+      setTargetRole(extracted.targetRole);
+      setExtractedSkills(extracted.skills);
     }
   };
 
@@ -45,18 +61,17 @@ export default function OnboardingPage() {
     setIsAnalyzing(true);
     setTimeout(() => {
       setIsAnalyzing(false);
-      const skills = ['React 18', 'Next.js App Router', 'TypeScript', 'Google Gemini API', 'Node.js', 'Prisma ORM', 'Tailwind CSS'];
-      setExtractedSkills(skills);
 
-      // Save candidate profile to localStorage for AI job discovery engine
+      // Save universal candidate profile to localStorage for AI job discovery engine
       const candidateProfile = {
+        stream,
+        targetRole,
+        skills: extractedSkills.length > 0 ? extractedSkills : ['Communication', 'Data Analysis', 'Project Management'],
+        experienceYears: 1,
         resumeFileName: resumeFile ? resumeFile.name : 'Uploaded_Resume.pdf',
         portfolioUrl: portfolioUrl || 'https://prakhar-portfolio.dev',
         linkedinUrl: linkedinUrl || 'https://linkedin.com/in/candidate',
         githubUrl: githubUrl || 'https://github.com/candidate',
-        targetRole,
-        skills,
-        experienceYears: 1,
         updatedAt: new Date().toISOString(),
       };
       localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(candidateProfile));
@@ -67,7 +82,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-6 flex flex-col justify-center items-center relative">
-      {/* Hidden File Input for Native Internal Storage Browser Picker */}
+      {/* Hidden File Input for Native Storage Browser Picker */}
       <input
         type="file"
         ref={fileInputRef}
@@ -85,17 +100,31 @@ export default function OnboardingPage() {
         {/* Top Header */}
         <div className="text-center space-y-2">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950 text-indigo-300 text-xs font-semibold border border-indigo-800/50">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Candidate AI Setup Wizard
+            <GraduationCap className="w-3.5 h-3.5 text-amber-400" /> Universal Candidate AI Setup Wizard
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Set Up Your Candidate Profile</h1>
-          <p className="text-xs text-slate-400">Step {step} of 3 — Upload your resume to let AI analyze your skills and discover target jobs.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Set Up Your Profile (All Academic Streams)</h1>
+          <p className="text-xs text-slate-400">Step {step} of 3 — Open to Commerce, Arts, Engineering, Management, Science, Law & Entry Level.</p>
         </div>
 
         {/* Card */}
         <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-6 shadow-2xl">
           {step === 1 && (
             <div className="space-y-5 text-xs">
-              <h2 className="font-bold text-sm text-white border-b border-slate-800 pb-2">1. Upload Resume from Your Storage</h2>
+              <h2 className="font-bold text-sm text-white border-b border-slate-800 pb-2">1. Select Stream & Upload Resume from Your Device Storage</h2>
+
+              {/* Stream Select Dropdown */}
+              <div className="space-y-1.5">
+                <label className="font-semibold text-slate-200 block">Select Academic & Professional Stream</label>
+                <select
+                  value={stream}
+                  onChange={(e) => handleStreamChange(e.target.value)}
+                  className="w-full bg-slate-800 text-slate-200 rounded-xl p-3 border border-slate-700 focus:outline-none focus:border-indigo-500 font-semibold"
+                >
+                  {streamsList.map(s => (
+                    <option key={s.name} value={s.name}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
 
               {/* Clickable Upload Dropzone */}
               <div
@@ -118,10 +147,10 @@ export default function OnboardingPage() {
                 ) : (
                   <div className="space-y-1">
                     <p className="font-bold text-sm text-slate-200 group-hover:text-indigo-300 transition-colors">
-                      Click to Open Device Internal Storage & Select Resume
+                      Click to Open Device Storage & Select Resume (Any Stream PDF/DOCX)
                     </p>
                     <p className="text-[11px] text-slate-400">
-                      Supports PDF, DOC, DOCX files (Up to 10MB)
+                      Supports B.Com, B.A, BBA, B.Tech, B.Sc, MBA, Law & Entry Level Resumes
                     </p>
                   </div>
                 )}
@@ -129,38 +158,14 @@ export default function OnboardingPage() {
 
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Portfolio URL (Optional)</label>
+                  <label className="font-semibold text-slate-300">Target Role Title</label>
                   <input
-                    type="url"
-                    value={portfolioUrl}
-                    onChange={(e) => setPortfolioUrl(e.target.value)}
-                    placeholder="https://yourportfolio.dev"
-                    className="w-full bg-slate-800 text-slate-200 rounded-xl p-2.5 border border-slate-700 focus:outline-none text-xs"
+                    type="text"
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    placeholder="e.g. Accountant, Content Writer, HR Executive, Software Developer"
+                    className="w-full bg-slate-800 text-slate-200 rounded-xl p-2.5 border border-slate-700 focus:outline-none text-xs font-semibold text-indigo-300"
                   />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">LinkedIn Profile URL</label>
-                    <input
-                      type="url"
-                      value={linkedinUrl}
-                      onChange={(e) => setLinkedinUrl(e.target.value)}
-                      placeholder="https://linkedin.com/in/username"
-                      className="w-full bg-slate-800 text-slate-200 rounded-xl p-2.5 border border-slate-700 focus:outline-none text-xs"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="font-semibold text-slate-300">GitHub Profile URL</label>
-                    <input
-                      type="url"
-                      value={githubUrl}
-                      onChange={(e) => setGithubUrl(e.target.value)}
-                      placeholder="https://github.com/username"
-                      className="w-full bg-slate-800 text-slate-200 rounded-xl p-2.5 border border-slate-700 focus:outline-none text-xs"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -169,10 +174,9 @@ export default function OnboardingPage() {
                   setStep(2);
                   handleStartAnalysis();
                 }}
-                disabled={!resumeFile && !portfolioUrl}
-                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30 disabled:opacity-50"
+                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
               >
-                <span>Run AI Resume & Skill Analysis</span>
+                <span>Run AI Resume Analysis for {stream}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -183,23 +187,23 @@ export default function OnboardingPage() {
               <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto animate-bounce">
                 <RefreshCw className="w-6 h-6 animate-spin text-indigo-400" />
               </div>
-              <h2 className="font-bold text-base text-white">Extracting Skills from {resumeFile ? resumeFile.name : 'Resume'}...</h2>
+              <h2 className="font-bold text-base text-white">Parsing Resume for {stream}...</h2>
               <p className="text-slate-400 max-w-sm mx-auto">
-                AI is parsing document text, categorizing technical competencies, and preparing targeted queries across 15 job sources.
+                AI is categorizing competencies for <strong>{targetRole}</strong> and preparing targeted queries across 15 job sources.
               </p>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-5 text-xs">
-              <h2 className="font-bold text-sm text-white border-b border-slate-800 pb-2">3. Resume Parsed & Target Job Discovery Configured</h2>
+              <h2 className="font-bold text-sm text-white border-b border-slate-800 pb-2">3. Resume Parsed & Targeted Job Discovery Active</h2>
 
               <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/40 space-y-2">
                 <h3 className="font-bold text-emerald-300 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Resume Parsed Successfully!
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Candidate Profile Configured!
                 </h3>
                 <p className="text-slate-300 text-[11px]">
-                  Uploaded File: <strong className="text-white">{resumeFile ? resumeFile.name : 'Resume.pdf'}</strong> • Portfolio Strength: <strong className="text-emerald-400">92/100</strong>
+                  Academic Stream: <strong className="text-white">{stream}</strong> • Target Role: <strong className="text-indigo-300">{targetRole}</strong>
                 </p>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {extractedSkills.map((s) => (
@@ -210,27 +214,15 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="font-semibold text-slate-300">Target Role Title (Used for 15-Source Search)</label>
-                  <input
-                    type="text"
-                    value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                    className="w-full bg-slate-800 text-slate-200 rounded-xl p-2.5 border border-slate-700 focus:outline-none text-xs font-semibold text-indigo-300"
-                  />
+              <div className="grid grid-cols-2 gap-3 text-slate-300">
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 text-[11px] block">Preferred Mode</span>
+                  <span className="font-bold text-white">Remote + Hybrid</span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-slate-300">
-                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 text-[11px] block">Preferred Mode</span>
-                    <span className="font-bold text-white">Remote + Hybrid</span>
-                  </div>
-
-                  <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
-                    <span className="text-slate-400 text-[11px] block">Minimum Target Salary</span>
-                    <span className="font-bold text-emerald-400">₹6 LPA - ₹18 LPA</span>
-                  </div>
+                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                  <span className="text-slate-400 text-[11px] block">Minimum Target Salary</span>
+                  <span className="font-bold text-emerald-400">₹6 LPA - ₹18 LPA</span>
                 </div>
               </div>
 
@@ -238,7 +230,7 @@ export default function OnboardingPage() {
                 onClick={() => router.push('/dashboard')}
                 className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-600/30"
               >
-                <span>Launch Job Search Dashboard with Uploaded Resume</span>
+                <span>Launch Job Search Dashboard for {targetRole}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
