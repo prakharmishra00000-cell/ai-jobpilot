@@ -16,18 +16,30 @@ export interface LiveFitAnalysis {
 
 /**
  * 100% Authentic Real-Time AI Job Fit Scoring & Pros/Cons Analyzer
- * Compares candidate's uploaded resume skills against actual job requirements.
+ * Compares candidate's uploaded resume skills & experience against actual job requirements.
  */
 export function analyzeLiveJobFit(
   job: RawJob,
   candidateSkills: string[] = ['React', 'Next.js', 'Node.js', 'TypeScript', 'AI APIs', 'Tailwind CSS'],
+  candidateYearsOfExp: number = 1,
   candidateRole: string = 'Software Developer'
 ): LiveFitAnalysis {
   const descLower = (job.description || '').toLowerCase();
   const titleLower = (job.title || '').toLowerCase();
   const reqs = job.requirements || [];
+  const expString = (job.experienceRequired || '').toLowerCase();
 
-  // 1. Calculate Pros (Matched Skills between Candidate Resume and Job Description)
+  // Parse required years of experience from job text
+  let requiredYears = 1;
+  if (descLower.includes('5+') || descLower.includes('5 years') || descLower.includes('5-7 years') || expString.includes('5+')) {
+    requiredYears = 5;
+  } else if (descLower.includes('3+') || descLower.includes('3 years') || descLower.includes('3-5 years') || expString.includes('3+')) {
+    requiredYears = 3;
+  } else if (descLower.includes('7+') || descLower.includes('7 years') || descLower.includes('senior')) {
+    requiredYears = 7;
+  }
+
+  // 1. Calculate Pros (Matched Skills & Work Mode)
   const pros: string[] = [];
   candidateSkills.forEach((skill) => {
     if (
@@ -43,27 +55,38 @@ export function analyzeLiveJobFit(
     pros.push('✓ Preferred work mode match: 100% Remote flexibility');
   }
 
-  // 2. Calculate Cons (Missing Skills / Gap Analysis)
+  // 2. Calculate Cons (Missing Skills & Experience Penalty)
   const cons: string[] = [];
-  const commonTechGaps = ['Docker', 'Kubernetes', 'AWS Lambda', 'GraphQL', 'Microservices', 'System Design'];
   
+  // Severe Experience Gap Penalty
+  if (requiredYears > candidateYearsOfExp) {
+    const gap = requiredYears - candidateYearsOfExp;
+    cons.push(`❌ Severe Experience Gap: Job requires ${requiredYears}+ years, candidate resume has ${candidateYearsOfExp} year (-${gap * 15}% score penalty)`);
+  } else {
+    pros.push(`✓ Experience Level Match: Candidate meets ${requiredYears}+ years requirement`);
+  }
+
+  const commonTechGaps = ['Docker', 'Kubernetes', 'AWS Lambda', 'GraphQL', 'Microservices', 'System Design'];
   commonTechGaps.forEach((gap) => {
     if (descLower.includes(gap.toLowerCase()) && !candidateSkills.some(s => s.toLowerCase() === gap.toLowerCase())) {
       cons.push(`⚠ Missing requirement from resume: ${gap} experience`);
     }
   });
 
-  if (cons.length === 0) {
-    cons.push('⚠ High competitive applicant volume for this role title');
+  // 3. Compute Real-Time Dynamic Fit Score (0-100%) with Experience Penalty
+  const matchRatio = candidateSkills.length > 0 ? (pros.length / Math.max(candidateSkills.length, 3)) : 0.75;
+  let baseScore = 75 + Math.round(matchRatio * 20);
+
+  // Apply experience penalty
+  if (requiredYears > candidateYearsOfExp) {
+    const gap = requiredYears - candidateYearsOfExp;
+    baseScore -= gap * 15; // Drop score by 15 points per missing year
   }
 
-  // 3. Compute Real-Time Dynamic Fit Score (0-100%) based on match ratio
-  const matchRatio = candidateSkills.length > 0 ? (pros.length / Math.max(candidateSkills.length, 3)) : 0.75;
-  const baseScore = 75 + Math.round(matchRatio * 20);
-  const fitScore = Math.min(Math.max(baseScore, 72), 98);
+  const fitScore = Math.min(Math.max(baseScore, 35), 98);
 
   // 4. Compute Shortlist Probability Estimate
-  const shortlistProbability = Math.round(fitScore * 0.85);
+  const shortlistProbability = Math.round(fitScore * 0.80);
 
   // 5. Generate Customized Cover Letter
   const customCoverLetter = `Dear Hiring Manager at ${job.company},
@@ -99,7 +122,7 @@ Portfolio: https://prakhar-portfolio.dev`;
 }
 
 /**
- * Gemini AI Profile Extractor (when GEMINI_API_KEY is present)
+ * Gemini AI Profile Extractor
  */
 export async function extractCandidateFromText(rawText: string) {
   if (!genAI) {

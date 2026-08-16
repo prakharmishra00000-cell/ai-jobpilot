@@ -16,6 +16,7 @@ import {
   Copy,
   Check,
   Smartphone,
+  AlertTriangle,
 } from 'lucide-react';
 import { sendRealtimeDeviceNotification } from '@/lib/notifications';
 import { analyzeLiveJobFit, LiveFitAnalysis } from '@/services/ai/gemini';
@@ -64,16 +65,16 @@ Responsibilities:
     // Read actual uploaded candidate resume profile
     const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
     const candidateSkills = profile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs', 'Tailwind CSS'];
+    const candidateYears = profile.experienceYears || 1;
     const targetRole = profile.targetRole || 'Software Developer';
 
-    const liveAnalysis = analyzeLiveJobFit(job, candidateSkills, targetRole);
+    const liveAnalysis = analyzeLiveJobFit(job, candidateSkills, candidateYears, targetRole);
     setAnalysis(liveAnalysis);
   }, []);
 
   const handleApply = () => {
     setAppliedStatus('APPLIED');
 
-    // Save application to localStorage for CRM & Dashboard tracking
     const existingApps = JSON.parse(localStorage.getItem('jobpilot_applications') || '[]');
     const newApp = {
       id: `app-${Date.now()}`,
@@ -107,6 +108,12 @@ Responsibilities:
     navigator.clipboard.writeText(text);
     setCopiedSection(sectionName);
     setTimeout(() => setCopiedSection(null), 2000);
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-amber-400 bg-amber-500/20 border-amber-500/30';
+    if (score >= 60) return 'text-indigo-400 bg-indigo-500/20 border-indigo-500/30';
+    return 'text-rose-400 bg-rose-500/20 border-rose-500/30';
   };
 
   return (
@@ -166,22 +173,22 @@ Responsibilities:
         {/* Real-Time Live AI Fit & Shortlist Banner */}
         <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 via-indigo-950/40 to-slate-950 border border-indigo-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-extrabold text-lg">
+            <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center font-extrabold text-lg ${getScoreColor(analysis?.fitScore || 92)}`}>
               {analysis?.fitScore || 92}%
             </div>
             <div>
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                🔥 Live Resume Fit Match <span className="text-xs text-amber-400 font-mono font-medium">{analysis?.fitScore || 92}/100 Score</span>
+                🔥 Live Resume Fit Match <span className="text-xs font-mono font-medium text-slate-300">{analysis?.fitScore || 92}/100 Score</span>
               </h3>
               <p className="text-xs text-slate-300 mt-0.5">
-                Shortlist Estimate: <strong className="text-emerald-400">{analysis?.shortlistProbability || 78}% (High Confidence)</strong>
+                Shortlist Estimate: <strong className="text-emerald-400">{analysis?.shortlistProbability || 78}%</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-[11px] text-emerald-300 font-semibold bg-emerald-950/80 px-3 py-2 rounded-xl border border-emerald-800/60">
             <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>24/7 Engine Evaluated Against Uploaded Candidate Resume</span>
+            <span>24/7 Engine Evaluated Against Candidate Resume & Experience</span>
           </div>
         </div>
       </div>
@@ -265,11 +272,13 @@ Responsibilities:
                 {/* CONS */}
                 <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/40 space-y-1.5">
                   <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
-                    <span>CONS (Skill Gaps & Analysis)</span>
+                    <span>CONS (Experience Gaps & Analysis)</span>
                   </h4>
                   <ul className="space-y-1 text-slate-300 text-[11px]">
                     {analysis?.cons.map((c, idx) => (
-                      <li key={idx}>{c}</li>
+                      <li key={idx} className={c.includes('❌') ? 'text-rose-400 font-semibold' : ''}>
+                        {c}
+                      </li>
                     )) || <li>⚠ High applicant volume for this role title</li>}
                   </ul>
                 </div>
