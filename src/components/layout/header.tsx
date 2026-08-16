@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Search, Bell, Sparkles, SlidersHorizontal, Code2, Smartphone } from 'lucide-react';
 import BackButton from '@/components/ui/back-button';
-import { requestNotificationPermission, sendRealtimeDeviceNotification } from '@/lib/notifications';
+import { requestNotificationPermission } from '@/lib/notifications';
 
 interface NotificationItem {
   id: string;
@@ -18,7 +18,7 @@ interface NotificationItem {
 export default function Header() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [devicePermission, setDevicePermission] = useState<boolean>(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
+  const [notifications] = useState<NotificationItem[]>([
     {
       id: 'init-1',
       title: '⚡ System Initialized',
@@ -38,14 +38,6 @@ export default function Header() {
   const handleEnableDeviceNotifications = async () => {
     const granted = await requestNotificationPermission();
     setDevicePermission(granted);
-    if (granted) {
-      sendRealtimeDeviceNotification(
-        'AI Full Stack Developer',
-        'Live Employer System',
-        'Direct Feed',
-        'https://remotive.com'
-      );
-    }
   };
 
   return (
@@ -129,14 +121,7 @@ export default function Header() {
                 ))}
               </div>
 
-              <div className="pt-3 mt-2 border-t border-slate-800 flex items-center justify-between text-[11px]">
-                <button
-                  onClick={handleEnableDeviceNotifications}
-                  className="font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-                >
-                  <Smartphone className="w-3 h-3" /> Test Device Notification
-                </button>
-
+              <div className="pt-3 mt-2 border-t border-slate-800 text-right text-[11px]">
                 <Link
                   href="/responses"
                   onClick={() => setShowNotifications(false)}
