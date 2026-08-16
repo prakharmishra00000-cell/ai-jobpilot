@@ -52,6 +52,28 @@ Responsibilities:
 
   const handleApply = () => {
     setAppliedStatus('APPLIED');
+
+    // Save application to localStorage for CRM & Dashboard metric tracking
+    const existingApps = JSON.parse(localStorage.getItem('jobpilot_applications') || '[]');
+    const newApp = {
+      id: `app-${Date.now()}`,
+      jobTitle: job.title,
+      company: job.company,
+      platform: job.source,
+      fitScore: 94,
+      shortlistProb: 78,
+      appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      status: 'Applied',
+      responseStatus: 'No Response Yet',
+      mode: 'Assisted Mode',
+      originalUrl: job.originalUrl,
+    };
+
+    // Deduplicate and save
+    if (!existingApps.some((a: any) => a.jobTitle === job.title && a.company === job.company)) {
+      localStorage.setItem('jobpilot_applications', JSON.stringify([newApp, ...existingApps]));
+    }
+
     // Trigger real-time OS / Device Notification
     sendRealtimeDeviceNotification(
       job.title,
@@ -59,6 +81,7 @@ Responsibilities:
       job.source,
       job.originalUrl
     );
+
     window.open(job.originalUrl, '_blank');
   };
 
@@ -145,7 +168,7 @@ GitHub: https://github.com/prakhar-dev`;
               }`}
             >
               <Send className="w-4 h-4" />
-              <span>{appliedStatus === 'APPLIED' ? '✓ Applied & Alert Sent' : 'Open Platform & Apply'}</span>
+              <span>{appliedStatus === 'APPLIED' ? '✓ Applied & Tracked' : 'Open Platform & Apply'}</span>
             </button>
           </div>
         </div>

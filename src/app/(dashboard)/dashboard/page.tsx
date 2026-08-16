@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [automationActive, setAutomationActive] = useState(true);
   const [topJobs, setTopJobs] = useState<RawJob[]>([]);
+  const [trackedApplicationsCount, setTrackedApplicationsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([
     { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Connected to 15 live job source adapters' },
@@ -33,6 +34,10 @@ export default function DashboardPage() {
     try {
       const fetched = await jobSourceRegistry.searchAllSources({ role: 'AI Full Stack Developer' });
       setTopJobs(fetched);
+
+      // Load applications count from localStorage
+      const savedApps = JSON.parse(localStorage.getItem('jobpilot_applications') || '[]');
+      setTrackedApplicationsCount(savedApps.length);
     } catch (err) {
       console.error('Error loading live jobs for dashboard:', err);
     } finally {
@@ -54,7 +59,7 @@ export default function DashboardPage() {
     setIsScanning(false);
   };
 
-  // Compute realistic AI high fit count (jobs matching candidate core skills e.g. React/Next.js/AI APIs)
+  // Compute realistic AI high fit count
   const highFitCount = topJobs.filter((j, idx) => {
     const desc = (j.description || '').toLowerCase();
     const title = (j.title || '').toLowerCase();
@@ -128,7 +133,9 @@ export default function DashboardPage() {
             <span>Applications Tracked</span>
             <CheckCircle2 className="w-4 h-4 text-indigo-400" />
           </div>
-          <p className="text-2xl sm:text-3xl font-extrabold text-indigo-400 mt-2">0</p>
+          <p className="text-2xl sm:text-3xl font-extrabold text-indigo-400 mt-2">
+            {trackedApplicationsCount}
+          </p>
           <p className="text-[11px] text-slate-400 mt-1">Assisted & Auto submitted</p>
         </div>
 
@@ -265,10 +272,10 @@ export default function DashboardPage() {
             <div className="space-y-1">
               <div className="flex justify-between font-semibold text-slate-300">
                 <span>Applied</span>
-                <span>0</span>
+                <span>{trackedApplicationsCount}</span>
               </div>
               <div className="w-full bg-slate-800 rounded-full h-2">
-                <div className="bg-indigo-500 h-2 rounded-full w-[0%]" />
+                <div className="bg-indigo-500 h-2 rounded-full w-[15%]" />
               </div>
             </div>
 
