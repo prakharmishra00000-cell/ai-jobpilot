@@ -18,7 +18,7 @@ import { jobSourceRegistry } from '@/adapters/registry';
 import { RawJob } from '@/types';
 
 export default function JobsPage() {
-  const [searchTerm, setSearchTerm] = useState('AI Full Stack Developer');
+  const [searchTerm, setSearchTerm] = useState('Software Developer');
   const [workModeFilter, setWorkModeFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [jobs, setJobs] = useState<RawJob[]>([]);
@@ -46,7 +46,15 @@ export default function JobsPage() {
     async function loadLiveJobs() {
       setIsLoading(true);
       try {
-        const fetched = await jobSourceRegistry.searchAllSources({ role: searchTerm });
+        // Query live jobs with auto-fallback to guarantee live results
+        const roleQuery = searchTerm.trim() || 'software developer';
+        let fetched = await jobSourceRegistry.searchAllSources({ role: roleQuery });
+        
+        // If exact phrase returned 0, search broader developer query
+        if (fetched.length === 0) {
+          fetched = await jobSourceRegistry.searchAllSources({ role: 'developer' });
+        }
+        
         setJobs(fetched);
       } catch (err) {
         console.error('Error fetching live jobs:', err);
@@ -59,16 +67,21 @@ export default function JobsPage() {
   }, [searchTerm]);
 
   const filteredJobs = jobs.filter((job) => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch =
-      job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchTerm.toLowerCase());
+      !term ||
+      job.title.toLowerCase().includes(term) ||
+      job.company.toLowerCase().includes(term) ||
+      job.description.toLowerCase().includes(term);
 
     const matchesMode = workModeFilter === 'All' || job.workMode === workModeFilter;
     const matchesSource = sourceFilter === 'All' || job.source === sourceFilter;
 
     return matchesSearch && matchesMode && matchesSource;
   });
+
+  // Fallback list if specific filter is too restrictive
+  const displayJobs = filteredJobs.length > 0 ? filteredJobs : jobs;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -94,7 +107,7 @@ export default function JobsPage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Filter by title, skills (e.g. React, Next.js, Node.js, AI APIs)..."
+              placeholder="Search by title, skills (e.g. Developer, React, Node.js, AI)..."
               className="w-full bg-slate-800/90 text-slate-200 text-xs rounded-xl pl-10 pr-4 py-2.5 border border-slate-700 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-500"
             />
           </div>
@@ -134,20 +147,20 @@ export default function JobsPage() {
       {/* Discovered Jobs List Grid */}
       <div className="space-y-4">
         <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-          <span>{isLoading ? 'Querying live job feeds...' : `Showing ${filteredJobs.length} live opportunities`}</span>
+          <span>{isLoading ? 'Querying live job feeds...' : `Showing ${displayJobs.length} live opportunities`}</span>
           <span>Sorted by Fit Score (Descending)</span>
         </div>
 
         {isLoading ? (
-          <div className="py-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+          <div className="py-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl">
             <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Fetching live API feeds across 15 platforms...
           </div>
-        ) : filteredJobs.length === 0 ? (
+        ) : displayJobs.length === 0 ? (
           <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-xs text-slate-400">
-            No live jobs matching "{searchTerm}". Try refining your search query or role title.
+            No live jobs matching "{searchTerm}". Click <button onClick={() => setSearchTerm('Software Developer')} className="text-indigo-400 font-semibold underline">here</button> to view all live developer opportunities.
           </div>
         ) : (
-          filteredJobs.slice(0, 15).map((job, idx) => (
+          displayJobs.slice(0, 15).map((job, idx) => (
             <div
               key={`${job.id}-${idx}`}
               className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 transition-all space-y-4 shadow-lg group"
