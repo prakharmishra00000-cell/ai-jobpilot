@@ -13,13 +13,14 @@ import {
   ShieldCheck,
   Globe,
   RefreshCw,
+  FileText,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
-import { analyzeLiveJobFit } from '@/services/ai/gemini';
+import { analyzeLiveJobFit, EXACT_PRAKHAR_RESUME_SKILLS } from '@/services/ai/gemini';
 import { RawJob } from '@/types';
 
 export default function JobsPage() {
-  const [searchTerm, setSearchTerm] = useState('Software Developer');
+  const [searchTerm, setSearchTerm] = useState('');
   const [workModeFilter, setWorkModeFilter] = useState('All');
   const [sourceFilter, setSourceFilter] = useState('All');
   const [jobs, setJobs] = useState<RawJob[]>([]);
@@ -46,31 +47,69 @@ export default function JobsPage() {
 
   useEffect(() => {
     // Read uploaded candidate resume profile
-    const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+    const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || 'null') || {
+      targetRole: 'AI FULL-STACK WEB DEVELOPER',
+      skills: EXACT_PRAKHAR_RESUME_SKILLS,
+      experienceYears: 1,
+    };
+    
     setCandidateProfile(profile);
 
-    async function loadLiveJobs() {
+    // Initial search defaults to candidate's exact resume target role
+    const initialRole = profile.targetRole || 'AI FULL-STACK WEB DEVELOPER';
+    setSearchTerm(initialRole);
+
+    async function loadResumeMatchedJobs() {
       setIsLoading(true);
       try {
-        const roleQuery = searchTerm.trim() || 'software developer';
-        let fetched = await jobSourceRegistry.searchAllSources({ role: roleQuery });
+        let fetched = await jobSourceRegistry.searchAllSources({ role: initialRole });
         
         if (fetched.length === 0) {
           fetched = await jobSourceRegistry.searchAllSources({ role: 'developer' });
         }
-        
-        setJobs(fetched);
+
+        // Calculate live fit scores & sort by highest resume match first
+        const candidateSkills = profile.skills || EXACT_PRAKHAR_RESUME_SKILLS;
+        const candidateYears = profile.experienceYears || 1;
+
+        const scored = fetched.map(job => ({
+          job,
+          analysis: analyzeLiveJobFit(job, candidateSkills, candidateYears, profile.targetRole)
+        })).sort((a, b) => b.analysis.fitScore - a.analysis.fitScore);
+
+        setJobs(scored.map(s => s.job));
       } catch (err) {
-        console.error('Error fetching live jobs:', err);
+        console.error('Error fetching resume matched live jobs:', err);
       } finally {
         setIsLoading(false);
       }
     }
 
-    loadLiveJobs();
-  }, [searchTerm]);
+    loadResumeMatchedJobs();
+  }, []);
 
-  const candidateSkills = candidateProfile?.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+  const handleSearchSubmit = async (queryOverride?: string) => {
+    const query = queryOverride !== undefined ? queryOverride : searchTerm;
+    setIsLoading(true);
+    try {
+      const fetched = await jobSourceRegistry.searchAllSources({ role: query || 'developer' });
+      const candidateSkills = candidateProfile?.skills || EXACT_PRAKHAR_RESUME_SKILLS;
+      const candidateYears = candidateProfile?.experienceYears || 1;
+
+      const scored = fetched.map(job => ({
+        job,
+        analysis: analyzeLiveJobFit(job, candidateSkills, candidateYears, candidateProfile?.targetRole)
+      })).sort((a, b) => b.analysis.fitScore - a.analysis.fitScore);
+
+      setJobs(scored.map(s => s.job));
+    } catch (err) {
+      console.error('Error performing job search:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const candidateSkills = candidateProfile?.skills || EXACT_PRAKHAR_RESUME_SKILLS;
   const candidateYears = candidateProfile?.experienceYears || 1;
 
   const filteredJobs = jobs.filter((job) => {
@@ -104,9 +143,38 @@ export default function JobsPage() {
             Discovered Jobs Engine <span className="text-xs text-indigo-400 bg-indigo-950 font-mono px-2 py-0.5 rounded border border-indigo-800/50">15 Connected Sources</span>
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time deduplicated job listings from 15 connected platforms, scored dynamically by experience & resume skills.
+            Live listings queried for <strong className="text-indigo-300">"{candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER'}"</strong> and ranked by your exact resume skills.
           </p>
         </div>
+      </div>
+
+      {/* Candidate Resume Context Pill Banner */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300 shadow-lg">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-950 text-indigo-400 flex items-center justify-center border border-indigo-800/50 shrink-0">
+            <FileText className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div>
+            <span className="font-bold text-white block">
+              Active Candidate Search Target: {candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER'}
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Matching Skills: {candidateSkills.slice(0, 4).join(', ')} ({candidateSkills.length} Total Resume Skills)
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => {
+            const role = candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER';
+            setSearchTerm(role);
+            handleSearchSubmit(role);
+          }}
+          className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 shrink-0"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          <span>Reset to Resume Search</span>
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -119,7 +187,8 @@ export default function JobsPage() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by title, skills (e.g. Developer, React, Node.js, AI)..."
+              onKeyDown={(e) => e.key === 'Enter' && handleSearchSubmit()}
+              placeholder="Search by title, skills (e.g. AI Developer, React, Next.js, APIs)..."
               className="w-full bg-slate-800/90 text-slate-200 text-xs rounded-xl pl-10 pr-4 py-2.5 border border-slate-700 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-500"
             />
           </div>
@@ -158,23 +227,28 @@ export default function JobsPage() {
 
       {/* Discovered Jobs List Grid */}
       <div className="space-y-4">
+        {/* Dynamic Opportunity Counter Header */}
         <div className="flex items-center justify-between text-xs text-slate-400 font-medium">
-          <span>{isLoading ? 'Querying live job feeds...' : `Showing ${displayJobs.length} live opportunities`}</span>
-          <span>Sorted by Fit Score (Descending)</span>
+          <span>
+            {isLoading
+              ? 'Querying live job feeds across 15 sources...'
+              : `Showing ${displayJobs.length} live opportunities matching candidate resume`}
+          </span>
+          <span className="text-indigo-400 font-semibold">Sorted by AI Resume Fit Score (Highest First)</span>
         </div>
 
         {isLoading ? (
           <div className="py-12 text-center text-xs text-slate-400 flex items-center justify-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl">
-            <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Fetching live API feeds across 15 platforms...
+            <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Querying live API feeds across 15 platforms...
           </div>
         ) : displayJobs.length === 0 ? (
           <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-2xl text-xs text-slate-400">
-            No live jobs matching "{searchTerm}". Click <button onClick={() => setSearchTerm('Software Developer')} className="text-indigo-400 font-semibold underline">here</button> to view all live developer opportunities.
+            No live jobs matching "{searchTerm}". Click <button onClick={() => { setSearchTerm('AI FULL-STACK WEB DEVELOPER'); handleSearchSubmit('AI FULL-STACK WEB DEVELOPER'); }} className="text-indigo-400 font-semibold underline">here</button> to search for AI Developer jobs.
           </div>
         ) : (
-          displayJobs.slice(0, 15).map((job, idx) => {
+          displayJobs.map((job, idx) => {
             // Real-Time Dynamic Fit Analysis per job
-            const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
+            const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears, candidateProfile?.targetRole);
 
             return (
               <div
@@ -196,7 +270,7 @@ export default function JobsPage() {
                       <span>•</span>
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3 text-slate-400" /> {job.location}</span>
                       <span>•</span>
-                      <span className="text-emerald-400 font-semibold">{job.salaryRange}</span>
+                      <span className="text-emerald-400 font-semibold">{job.salaryRange || '₹10 LPA - ₹18 LPA'}</span>
                     </div>
                   </div>
 
