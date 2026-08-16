@@ -1,0 +1,253 @@
+// Prisma Schema for JobPilot AI (SQLite for zero-setup local dev, PostgreSQL ready)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id            String             @id @default(uuid())
+  name          String
+  email         String             @unique
+  passwordHash  String?
+  avatarUrl     String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  profile       CandidateProfile?
+  activityLogs  ActivityLog[]
+  notifications Notification[]
+}
+
+model CandidateProfile {
+  id                String             @id @default(uuid())
+  userId            String             @unique
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Basic & Links
+  name              String?
+  email             String?
+  phone             String?
+  location          String?
+  portfolioUrl      String?
+  linkedinUrl       String?
+  githubUrl         String?
+  resumeUrl         String?
+
+  // Extracted Data (stored as JSON string in SQLite)
+  education         String?            // JSON: degrees, universities, year, coursework
+  skills            String?            // JSON: programming languages, frameworks, frontend, backend, AI/ML, DevOps, soft skills
+  projects          String?            // JSON: name, desc, tech, role, achievements, URLs
+  experience        String?            // JSON: company, role, duration, achievements
+  certifications    String?            // JSON: titles, issuers, dates
+  careerDirection   String?            // JSON: preferred roles, target title
+  
+  // Portfolio AI Analysis
+  portfolioAnalysis String?            // JSON: scores, strengths, weaknesses, recommendations
+  portfolioScore    Int                @default(85)
+  analyzedAt        DateTime?
+
+  // User Preferences
+  targetRoles       String?            // Comma-separated or JSON
+  preferredLocations String?           // Comma-separated or JSON
+  workModes         String?            // Remote, Hybrid, On-site
+  employmentTypes   String?            // Full-time, Internship, Freelance, Contract
+  minSalary         String?            // e.g. "$80,000" or "₹8 LPA"
+  experienceLevel   String?            // Fresher / 0-1 yrs / 1-3 yrs / 3-5 yrs
+  technologies      String?            // Comma-separated or JSON
+  industries        String?            // Comma-separated or JSON
+  
+  // Relations
+  scores            JobScore[]
+  applications      Application[]
+  automationConfig  AutomationConfig?
+
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model JobSource {
+  id              String     @id @default(uuid())
+  name            String     @unique // LinkedIn, Indeed, JSearch, Adzuna, Remotive, Greenhouse, Lever, etc.
+  adapterType     String     // api | feed | assisted
+  status          String     @default("ACTIVE") // ACTIVE | DEGRADED | INACTIVE
+  mode            String     @default("AUTONOMOUS") // AUTONOMOUS | ASSISTED
+  apiConfig       String?    // JSON string for API keys or endpoints
+  lastSync        DateTime?
+  jobsFoundCount  Int        @default(0)
+  jobs            Job[]
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model Job {
+  id                  String       @id @default(uuid())
+  sourceId            String
+  source              JobSource    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalJobId       String
+  title               String
+  company             String
+  companyUrl          String?
+  location            String
+  workMode            String       @default("Remote") // Remote | Hybrid | On-site
+  salaryRange         String?
+  experienceRequired  String?
+  employmentType      String?      // Full-time | Internship | Contract | Freelance
+  description         String
+  requirements        String?      // JSON string of required skills/qualifications
+  preferredSkills     String?      // JSON string
+  benefits            String?      // JSON string
+  applicationUrl      String
+  originalUrl         String
+  applicationMethod   String       @default("ASSISTED") // DIRECT_API | ASSISTED | REDIRECT
+  safetyScore         Int          @default(90) // Job quality / safety rating
+  isVerified          Boolean      @default(true)
+  postedAt            DateTime     @default(now())
+  expiresAt           DateTime?
+  discoveredAt        DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  scores              JobScore[]
+  applications        Application[]
+}
+
+model JobScore {
+  id                   String           @id @default(uuid())
+  jobId                String
+  job                  Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId          String
+  candidate            CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  fitScore             Int              // 0 - 100
+  shortlistProbability Int              // 0 - 100
+  confidence           String           @default("High") // High | Medium | Low
+  category             String           @default("Strong Match") // Apply Immediately (90+) | Strong Match (80-89) | Possible Match (65-79) | Low Match (<65)
+  
+  strengths            String?          // JSON: list of matching criteria
+  missingRequirements  String?          // JSON: list of missing requirements
+  skillBreakdown       String?          // JSON: skill by skill match details
+  explanation          String?          // JSON: detailed multi-factor breakdown
+
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model Application {
+  id              String                @id @default(uuid())
+  candidateId     String
+  candidate       CandidateProfile      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  jobId           String
+  job             Job                   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  status          String                @default("Discovered") 
+  // Discovered | Reviewed | Ready to Apply | Application Started | Applied | Application Failed | Needs User Action | Withdrawn | Rejected | Interview | Offer
+  
+  mode            String                @default("ASSISTED") // AUTONOMOUS | ASSISTED
+  appliedAt       DateTime?
+  applicationUrl  String?
+  confirmationId String?
+  platform        String                @default("LinkedIn")
+  answers         String?               // JSON string of submitted QA pairs
+
+  documents       ApplicationDocument[]
+  timeline        ApplicationTimeline[]
+  messages        Message[]
+  responses       Response[]
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
+model ApplicationDocument {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          String      // RESUME | COVER_LETTER | ANSWERS
+  version       String      // e.g. "v1.2"
+  content       String      // Full text or Markdown content
+  fileUrl       String?
+  createdAt     DateTime    @default(now())
+}
+
+model ApplicationTimeline {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  event         String      // Discovered | Score Calculated | Application Prepared | Applied | Confirmed | Response Received
+  details       String?
+  occurredAt    DateTime    @default(now())
+}
+
+model Message {
+  id                    String      @id @default(uuid())
+  applicationId         String
+  application           Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  recipient             String      // Recruiter or hiring manager name/email
+  recipientRole         String?
+  messageContent        String
+  platform              String      // LinkedIn | Email | Platform
+  status                String      @default("DRAFT") // DRAFT | SENT | FAILED
+  personalizationScore  Int         @default(90)
+  sentAt                DateTime?
+  createdAt             DateTime    @default(now())
+}
+
+model Response {
+  id            String      @id @default(uuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  type          String      // Interview Invitation | Assessment | Confirmation | Rejection | Offer | General Query
+  content       String
+  classification String     // AI classification result
+  confidence    Int         @default(95)
+  sourceEmail   String?
+  receivedAt    DateTime    @default(now())
+  processedAt   DateTime    @default(now())
+}
+
+model AutomationConfig {
+  id                        String           @id @default(uuid())
+  candidateId               String           @unique
+  candidate                 CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  isActive                  Boolean          @default(true)
+  scanFrequency             String           @default("30m") // 15m | 30m | 1h | 6h | 24h
+  autoApply                 Boolean          @default(false)
+  recruiterOutreach         Boolean          @default(false)
+  maxApplicationsPerDay     Int              @default(10)
+  maxApplicationsPerHour    Int              @default(3)
+  minFitScore               Int              @default(80)
+  minShortlistProbability   Int              @default(70)
+  approvalMode              String           @default("ALWAYS_REQUIRE") // ALWAYS_REQUIRE | REQUIRE_BELOW_90 | NEVER_FOR_SUPPORTED
+  controlMode               String           @default("ASSISTED") // MANUAL | ASSISTED | AUTONOMOUS
+  
+  createdAt                 DateTime         @default(now())
+  updatedAt                 DateTime         @updatedAt
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String   // Job Searched | Score Calculated | Application Prepared | Application Submitted | Response Detected
+  platform   String   // System | JSearch | Adzuna | LinkedIn | Indeed
+  metadata   String?  // JSON additional details
+  result     String   @default("SUCCESS") // SUCCESS | FAILURE | WARNING
+  createdAt  DateTime @default(now())
+}
+
+model Notification {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String   // JOB_DISCOVERED | APPLICATION_SUBMITTED | RESPONSE_RECEIVED | ACTION_REQUIRED | SYSTEM
+  title      String
+  message    String
+  priority   String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  isRead     Boolean  @default(false)
+  actionUrl  String?
+  createdAt  DateTime @default(now())
+}
