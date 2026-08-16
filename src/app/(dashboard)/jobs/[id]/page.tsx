@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -18,21 +18,27 @@ import {
   Smartphone,
 } from 'lucide-react';
 import { sendRealtimeDeviceNotification } from '@/lib/notifications';
+import { analyzeLiveJobFit, LiveFitAnalysis } from '@/services/ai/gemini';
+import { RawJob } from '@/types';
 
 export default function JobDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState<'fit' | 'coverLetter' | 'answers' | 'recruiter'>('fit');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [appliedStatus, setAppliedStatus] = useState<'NOT_APPLIED' | 'APPLIED'>('NOT_APPLIED');
+  const [analysis, setAnalysis] = useState<LiveFitAnalysis | null>(null);
 
-  // Live Job Details state
-  const job = {
+  // Live Job Details
+  const job: RawJob = {
     id: params.id || 'live-job-1',
     title: 'AI Full Stack Developer',
     company: 'Cognitive Web Systems',
     source: 'LinkedIn via JSearch',
+    externalJobId: params.id || 'ext-101',
     location: 'Remote (India / Global)',
     salaryRange: '₹10 LPA - ₹18 LPA ($60,000 - $90,000)',
     workMode: 'Remote',
+    experienceRequired: '0-2 Years',
+    employmentType: 'Full-time',
     description: `We are seeking an enthusiastic AI Full Stack Developer to build next-generation web platforms. You will design responsive Next.js user interfaces, create scalable Node.js/Python API endpoints, and integrate LLM APIs (Gemini, OpenAI) for autonomous workflow automation.
 
 Responsibilities:
@@ -47,21 +53,35 @@ Responsibilities:
       'Strong understanding of responsive UI with Tailwind CSS',
     ],
     preferredSkills: ['Vector DBs', 'BullMQ', 'Docker', 'WebSockets'],
+    applicationUrl: 'https://remotive.com/remote-jobs/software-dev/ai-full-stack-developer-101',
     originalUrl: 'https://remotive.com/remote-jobs/software-dev/ai-full-stack-developer-101',
+    applicationMethod: 'ASSISTED',
+    postedAt: new Date().toISOString(),
+    safetyScore: 95,
   };
+
+  useEffect(() => {
+    // Read actual uploaded candidate resume profile
+    const profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
+    const candidateSkills = profile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs', 'Tailwind CSS'];
+    const targetRole = profile.targetRole || 'Software Developer';
+
+    const liveAnalysis = analyzeLiveJobFit(job, candidateSkills, targetRole);
+    setAnalysis(liveAnalysis);
+  }, []);
 
   const handleApply = () => {
     setAppliedStatus('APPLIED');
 
-    // Save application to localStorage for CRM & Dashboard metric tracking
+    // Save application to localStorage for CRM & Dashboard tracking
     const existingApps = JSON.parse(localStorage.getItem('jobpilot_applications') || '[]');
     const newApp = {
       id: `app-${Date.now()}`,
       jobTitle: job.title,
       company: job.company,
       platform: job.source,
-      fitScore: 94,
-      shortlistProb: 78,
+      fitScore: analysis?.fitScore || 92,
+      shortlistProb: analysis?.shortlistProbability || 78,
       appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
       status: 'Applied',
       responseStatus: 'No Response Yet',
@@ -69,12 +89,10 @@ Responsibilities:
       originalUrl: job.originalUrl,
     };
 
-    // Deduplicate and save
     if (!existingApps.some((a: any) => a.jobTitle === job.title && a.company === job.company)) {
       localStorage.setItem('jobpilot_applications', JSON.stringify([newApp, ...existingApps]));
     }
 
-    // Trigger real-time OS / Device Notification
     sendRealtimeDeviceNotification(
       job.title,
       job.company,
@@ -90,34 +108,6 @@ Responsibilities:
     setCopiedSection(sectionName);
     setTimeout(() => setCopiedSection(null), 2000);
   };
-
-  const coverLetterText = `Dear Hiring Manager at ${job.company},
-
-I am writing to express my strong interest in the ${job.title} position. Having reviewed your requirements, I am confident that my background in full-stack web development and AI API integration makes me an ideal fit.
-
-Recently, I developed JobPilot AI — an autonomous job search agent built with Next.js 14, TypeScript, and Google Gemini AI. This project involved constructing multi-source API adapters, multi-factor fit scoring algorithms, and responsive real-time UI components, directly reflecting the technical skills needed at ${job.company}.
-
-I would welcome the opportunity to discuss how my technical passion and project experience can contribute to your engineering goals.
-
-Best regards,
-Prakhar Sharma
-Portfolio: https://prakhar-portfolio.dev
-GitHub: https://github.com/prakhar-dev`;
-
-  const applicationQA = [
-    {
-      q: `Why do you want to join ${job.company}?`,
-      a: `I admire ${job.company}'s commitment to building cutting-edge web applications. My background in modern React, Next.js, and generative AI APIs aligns directly with your engineering stack and product mission.`,
-    },
-    {
-      q: `Why are you suitable for the ${job.title} role?`,
-      a: `I bring hands-on experience developing deployed full-stack web applications using React 18, Next.js App Router, TypeScript, and Node.js, combined with proven ability to integrate generative AI models into real-world user workflows.`,
-    },
-    {
-      q: `Describe your most relevant project for this role.`,
-      a: `My most relevant project is JobPilot AI, a full-stack application that queries job APIs, evaluates job fit using multi-factor AI scoring, deduplicates listings across sources, and tracks applications in real-time.`,
-    },
-  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -173,25 +163,25 @@ GitHub: https://github.com/prakhar-dev`;
           </div>
         </div>
 
-        {/* Real-time Notification Banner */}
+        {/* Real-Time Live AI Fit & Shortlist Banner */}
         <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 via-indigo-950/40 to-slate-950 border border-indigo-800/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center font-extrabold text-lg">
-              94%
+              {analysis?.fitScore || 92}%
             </div>
             <div>
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                🔥 Apply Immediately <span className="text-xs text-amber-400 font-mono font-medium">94/100 Fit Score</span>
+                🔥 Live Resume Fit Match <span className="text-xs text-amber-400 font-mono font-medium">{analysis?.fitScore || 92}/100 Score</span>
               </h3>
               <p className="text-xs text-slate-300 mt-0.5">
-                Estimated Shortlist Probability: <strong className="text-emerald-400">78% (High Confidence)</strong>
+                Shortlist Estimate: <strong className="text-emerald-400">{analysis?.shortlistProbability || 78}% (High Confidence)</strong>
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-[11px] text-emerald-300 font-semibold bg-emerald-950/80 px-3 py-2 rounded-xl border border-emerald-800/60">
             <Smartphone className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>Real-time device notification will fire upon submission!</span>
+            <span>24/7 Engine Evaluated Against Uploaded Candidate Resume</span>
           </div>
         </div>
       </div>
@@ -237,7 +227,7 @@ GitHub: https://github.com/prakhar-dev`;
               onClick={() => setActiveTab('fit')}
               className={`flex-1 py-2 rounded-lg transition-colors ${activeTab === 'fit' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
             >
-              Fit Breakdown
+              Pros & Cons
             </button>
             <button
               onClick={() => setActiveTab('coverLetter')}
@@ -256,25 +246,31 @@ GitHub: https://github.com/prakhar-dev`;
           {activeTab === 'fit' && (
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-xs">
               <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-indigo-400" /> Multi-Factor Match Analysis
+                <Sparkles className="w-4 h-4 text-indigo-400" /> Resume Pros & Cons Analysis
               </h3>
 
               <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-800/40 space-y-1">
-                  <h4 className="font-bold text-emerald-300">Why You're a Strong Match</h4>
+                {/* PROS */}
+                <div className="p-3.5 rounded-xl bg-emerald-950/40 border border-emerald-800/40 space-y-1.5">
+                  <h4 className="font-bold text-emerald-300 flex items-center gap-1.5">
+                    <span>PROS (Verified Skill Matches)</span>
+                  </h4>
                   <ul className="space-y-1 text-slate-300 text-[11px]">
-                    <li>✓ React 18 & Next.js App Router verified in portfolio</li>
-                    <li>✓ Google Gemini & OpenAI API integration experience</li>
-                    <li>✓ Deployed full-stack applications with metrics</li>
-                    <li>✓ Preferred location matches (Remote / India)</li>
+                    {analysis?.pros.map((p, idx) => (
+                      <li key={idx}>{p}</li>
+                    )) || <li>✓ Verified match for candidate skills in resume</li>}
                   </ul>
                 </div>
 
-                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-800/40 space-y-1">
-                  <h4 className="font-bold text-amber-300">Missing / Gap Requirements</h4>
+                {/* CONS */}
+                <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/40 space-y-1.5">
+                  <h4 className="font-bold text-amber-300 flex items-center gap-1.5">
+                    <span>CONS (Skill Gaps & Analysis)</span>
+                  </h4>
                   <ul className="space-y-1 text-slate-300 text-[11px]">
-                    <li>⚠ 3+ years enterprise corporate experience (Candidate: 0-1 yrs)</li>
-                    <li>⚠ Production Kubernetes deployment experience</li>
+                    {analysis?.cons.map((c, idx) => (
+                      <li key={idx}>{c}</li>
+                    )) || <li>⚠ High applicant volume for this role title</li>}
                   </ul>
                 </div>
               </div>
@@ -285,10 +281,10 @@ GitHub: https://github.com/prakhar-dev`;
             <div className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-4 text-xs">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-sm text-white flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-indigo-400" /> Customized Cover Letter
+                  <FileText className="w-4 h-4 text-indigo-400" /> Tailored Cover Letter
                 </h3>
                 <button
-                  onClick={() => handleCopy(coverLetterText, 'coverLetter')}
+                  onClick={() => handleCopy(analysis?.customCoverLetter || '', 'coverLetter')}
                   className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold flex items-center gap-1 border border-slate-700"
                 >
                   {copiedSection === 'coverLetter' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
@@ -297,7 +293,7 @@ GitHub: https://github.com/prakhar-dev`;
               </div>
 
               <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 leading-relaxed font-sans whitespace-pre-line max-h-80 overflow-y-auto text-[11px]">
-                {coverLetterText}
+                {analysis?.customCoverLetter}
               </div>
             </div>
           )}
@@ -309,7 +305,7 @@ GitHub: https://github.com/prakhar-dev`;
               </h3>
 
               <div className="space-y-3">
-                {applicationQA.map((qa, idx) => (
+                {analysis?.applicationQA.map((qa, idx) => (
                   <div key={idx} className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
                     <div className="flex items-center justify-between font-bold text-slate-200">
                       <span>{qa.q}</span>
