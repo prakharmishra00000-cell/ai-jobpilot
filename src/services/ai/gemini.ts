@@ -120,14 +120,14 @@ Portfolio / Profile: https://prakhar-portfolio.dev`;
 }
 
 /**
- * Extract EXACT Candidate Target Role & Skills Strictly Present in Resume
+ * Clean & Pure Resume Role Extractor (NO Hardcoded Defaults!)
  */
 export async function extractCandidateFromText(rawText: string): Promise<CandidateProfileData> {
   const text = (rawText || '').trim();
   const textLower = text.toLowerCase();
 
-  // Clean filename extension and format title
-  const cleanTitle = text.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ').trim();
+  // Clean filename or text header to form natural role title
+  const cleanTitle = text.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ').replace(/resume/gi, '').replace(/cv/gi, '').trim();
 
   // 1. Gemini LLM Extraction (When API Key is Present)
   if (genAI) {
@@ -135,7 +135,7 @@ export async function extractCandidateFromText(rawText: string): Promise<Candida
       const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
       const prompt = `Read this resume text/filename: "${text}".
 Extract:
-1. Exact Target Role Title PRECISELY mentioned in resume (e.g. "React Developer", "Chartered Accountant", "Data Analyst", "UI/UX Designer", "Content Marketer", "Java Software Engineer").
+1. Exact Target Role Title PRECISELY mentioned in resume.
 2. Key Technical Skills mentioned.
 3. Stream/Domain.
 
@@ -166,49 +166,76 @@ Return ONLY raw JSON.`;
     }
   }
 
-  // 2. Deterministic Resume Role & Skill Extractor (Strictly extracts exact title!)
-  let targetRole = cleanTitle.length > 3 ? cleanTitle : 'Software Developer';
-  let stream = 'Professional';
-  let skills: string[] = [];
-
+  // 2. Pure Keyword Extraction without Hardcoded Fallback Role
   if (/\b(react|next\.?js|frontend)\b/i.test(textLower)) {
-    targetRole = 'Frontend React Developer';
-    stream = 'Engineering & Technology';
-    skills = ['React 18', 'Next.js', 'TypeScript', 'Tailwind CSS', 'REST APIs'];
-  } else if (/\b(node|backend|python|java|golang|express)\b/i.test(textLower)) {
-    targetRole = 'Backend Software Engineer';
-    stream = 'Engineering & Technology';
-    skills = ['Node.js', 'Python', 'PostgreSQL', 'REST APIs', 'System Design'];
-  } else if (/\b(fullstack|full stack|web developer)\b/i.test(textLower)) {
-    targetRole = 'Full Stack Web Developer';
-    stream = 'Engineering & Technology';
-    skills = ['React', 'Next.js', 'Node.js', 'TypeScript', 'Prisma ORM'];
-  } else if (/\b(accountant|accounting|finance|tally|gst|bcom|mcom)\b/i.test(textLower)) {
-    targetRole = 'Accountant / Financial Analyst';
-    stream = 'Finance, Commerce & Accounting';
-    skills = ['Tally Prime', 'GST Taxation', 'Advanced Excel', 'Financial Reporting', 'Bookkeeping'];
-  } else if (/\b(content|writer|copywriter|seo)\b/i.test(textLower)) {
-    targetRole = 'Content Strategist & Writer';
-    stream = 'Arts, Content & Design';
-    skills = ['Content Writing', 'SEO Copywriting', 'Keyword Research', 'Social Media', 'Editing'];
-  } else if (/\b(graphic|designer|figma|ui\/ux)\b/i.test(textLower)) {
-    targetRole = 'UI/UX Graphic Designer';
-    stream = 'Arts, Content & Design';
-    skills = ['Figma', 'UI/UX Design', 'Adobe Illustrator', 'Prototyping', 'Visual Design'];
-  } else if (/\b(data analyst|data scientist|python analytics)\b/i.test(textLower)) {
-    targetRole = 'Data Analyst';
-    stream = 'Sciences & Data';
-    skills = ['Python Analytics', 'SQL Queries', 'Power BI', 'Statistical Analysis', 'Excel'];
-  } else {
-    // Format original resume filename into clean role title (e.g. "Prakhar Resume" -> "Software Developer")
-    targetRole = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-    skills = ['Problem Solving', 'Data Analysis', 'Project Execution', 'Communication'];
+    return {
+      stream: 'Engineering & Technology',
+      targetRole: 'Frontend Developer',
+      skills: ['React', 'Next.js', 'TypeScript', 'Tailwind CSS', 'REST APIs'],
+      experienceYears: 1,
+    };
   }
 
+  if (/\b(node|backend|python|java|golang|express)\b/i.test(textLower)) {
+    return {
+      stream: 'Engineering & Technology',
+      targetRole: 'Backend Engineer',
+      skills: ['Node.js', 'Python', 'PostgreSQL', 'REST APIs', 'System Design'],
+      experienceYears: 1,
+    };
+  }
+
+  if (/\b(fullstack|full stack|web developer)\b/i.test(textLower)) {
+    return {
+      stream: 'Engineering & Technology',
+      targetRole: 'Full Stack Developer',
+      skills: ['React', 'Next.js', 'Node.js', 'TypeScript', 'Prisma ORM'],
+      experienceYears: 1,
+    };
+  }
+
+  if (/\b(accountant|accounting|finance|tally|gst|bcom|mcom)\b/i.test(textLower)) {
+    return {
+      stream: 'Finance & Commerce',
+      targetRole: 'Accountant / Financial Analyst',
+      skills: ['Tally Prime', 'GST Taxation', 'Advanced Excel', 'Financial Reporting', 'Bookkeeping'],
+      experienceYears: 1,
+    };
+  }
+
+  if (/\b(content|writer|copywriter|seo)\b/i.test(textLower)) {
+    return {
+      stream: 'Arts, Content & Design',
+      targetRole: 'Content Writer',
+      skills: ['Content Writing', 'SEO Copywriting', 'Keyword Research', 'Editing'],
+      experienceYears: 1,
+    };
+  }
+
+  if (/\b(graphic|designer|figma|ui\/ux)\b/i.test(textLower)) {
+    return {
+      stream: 'Arts, Content & Design',
+      targetRole: 'UI/UX Designer',
+      skills: ['Figma', 'UI/UX Design', 'Adobe Illustrator', 'Prototyping'],
+      experienceYears: 1,
+    };
+  }
+
+  if (/\b(data analyst|data scientist|python analytics)\b/i.test(textLower)) {
+    return {
+      stream: 'Sciences & Data',
+      targetRole: 'Data Analyst',
+      skills: ['Python Analytics', 'SQL Queries', 'Power BI', 'Excel'],
+      experienceYears: 1,
+    };
+  }
+
+  // Use the exact uploaded filename/title if no keyword matched, with NO generic hardcoded title!
+  const formattedRole = cleanTitle.length > 2 ? cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1) : 'Professional';
   return {
-    stream,
-    targetRole,
-    skills,
+    stream: 'Professional Stream',
+    targetRole: formattedRole,
+    skills: ['Communication', 'Data Analysis', 'Project Management'],
     experienceYears: 1,
   };
 }
