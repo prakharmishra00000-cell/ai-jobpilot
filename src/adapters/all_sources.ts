@@ -144,3 +144,9 @@ export const allJobSourceAdapters: JobSourceAdapter[] = [
   new GenericSourceAdapter('Government Employment Portals (NCS/USAJobs)'),
   new GenericSourceAdapter('Other Legitimate Public Sources'),
 ];
+
+export const allSourcesAdapter = {
+  async fetchJobs(role?: string): Promise<RawJob[]> {
+    return EXACT_AI_MATCHED_JOBS;
+  }
+};
