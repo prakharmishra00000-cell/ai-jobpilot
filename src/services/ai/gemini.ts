@@ -18,6 +18,7 @@ export interface CandidateProfileData {
   email: string;
   phone: string;
   college: string;
+  stream: string;
   branch: string;
   graduationYear: string;
   targetRole: string;
@@ -159,6 +160,7 @@ export async function extractCandidateFromText(rawText: string): Promise<Candida
       email: '',
       phone: '',
       college: '',
+      stream: '',
       branch: '',
       graduationYear: '',
       targetRole: '',
@@ -243,8 +245,9 @@ export async function extractCandidateFromText(rawText: string): Promise<Candida
     email: email || 'prakharmishraflp@gmail.com',
     phone: phone || '+91 6372843175',
     college: college || 'Madan Mohan Malaviya University of Technology (MMMUT)',
-    branch: branch,
-    graduationYear: graduationYear,
+    stream: branch || 'Mechanical Engineering',
+    branch: branch || 'Mechanical Engineering',
+    graduationYear: graduationYear || '2026 (Final Year)',
     targetRole: targetRole || 'AI FULL-STACK WEB DEVELOPER',
     skills: finalSkills.length > 0 ? finalSkills : EXACT_PRAKHAR_RESUME_SKILLS,
     experienceYears: 1,
