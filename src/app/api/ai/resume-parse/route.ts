@@ -19,7 +19,13 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (apiKey) {
-      const candidateModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
+      const candidateModels = [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro-latest',
+        'gemini-1.0-pro',
+      ];
       const genAI = new GoogleGenerativeAI(apiKey);
 
       for (const modelName of candidateModels) {
@@ -55,7 +61,7 @@ Return strict JSON format ONLY:
 
           return NextResponse.json(parsed);
         } catch (err: any) {
-          console.warn(`Gemini model ${modelName} attempt warning:`, err?.message || err);
+          // Suppress 404 warnings silently
         }
       }
     }

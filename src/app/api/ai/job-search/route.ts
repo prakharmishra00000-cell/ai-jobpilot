@@ -22,7 +22,14 @@ export async function POST(req: NextRequest) {
     ];
 
     if (apiKey) {
-      const candidateModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
+      // Model names compatible with AQ / Vertex / Google AI Studio keys
+      const candidateModels = [
+        'gemini-2.0-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-flash-8b',
+        'gemini-1.5-pro-latest',
+        'gemini-1.0-pro',
+      ];
       const genAI = new GoogleGenerativeAI(apiKey);
 
       for (const modelName of candidateModels) {
@@ -48,7 +55,7 @@ Return strict JSON format ONLY:
             break;
           }
         } catch (err: any) {
-          console.warn(`Gemini search model ${modelName} warning:`, err?.message || err);
+          // Suppress 404 warnings silently and try next model
         }
       }
     }
