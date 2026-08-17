@@ -17,6 +17,9 @@ import {
   Upload,
   FileText,
   AlertTriangle,
+  GraduationCap,
+  Mail,
+  Phone,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
 import { analyzeLiveJobFit, extractCandidateFromText, EXACT_PRAKHAR_RESUME_SKILLS } from '@/services/ai/gemini';
@@ -35,7 +38,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([
     { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Connected to 15 live job source adapters' },
-    { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Extracted exact resume technical skills for Prakhar Mishra' },
+    { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: 'Extracted candidate profile details strictly from resume document' },
   ]);
 
   const loadLiveDashboardData = async () => {
@@ -43,18 +46,18 @@ export default function DashboardPage() {
     try {
       let profile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || 'null');
       
-      // PURGE WRONG CACHED SKILLS (such as Prisma ORM or generic TypeScript) AND OVERWRITE WITH EXACT RESUME SKILLS
-      if (!profile || !profile.skills || profile.skills.includes('Prisma ORM') || !profile.skills.includes('AI-powered applications')) {
+      if (!profile || !profile.skills || profile.skills.length === 0) {
         profile = {
           name: 'Prakhar Mishra',
-          stream: 'B.Tech Mechanical Engineering',
+          email: 'prakharmishraflp@gmail.com',
+          phone: '+91 6372843175',
+          college: 'Madan Mohan Malaviya University of Technology (MMMUT)',
+          branch: 'Mechanical Engineering',
+          graduationYear: '2026 (Final Year)',
           targetRole: 'AI FULL-STACK WEB DEVELOPER',
           skills: EXACT_PRAKHAR_RESUME_SKILLS,
           experienceYears: 1,
           resumeFileName: 'Prakhar_Mishra_Resume.pdf',
-          portfolioUrl: 'https://prakhar-portfolio.dev',
-          linkedinUrl: 'https://linkedin.com/in/prakhar-mishra',
-          githubUrl: 'https://github.com/prakhar-mishra',
           updatedAt: new Date().toISOString(),
         };
         localStorage.setItem('jobpilot_candidate_profile', JSON.stringify(profile));
@@ -103,11 +106,15 @@ export default function DashboardPage() {
           }
 
           const newProfile = {
-            name: extracted.name || 'Prakhar Mishra',
+            name: extracted.name,
+            email: extracted.email,
+            phone: extracted.phone,
+            college: extracted.college,
+            branch: extracted.branch,
+            graduationYear: extracted.graduationYear,
             resumeFileName: file.name,
-            stream: extracted.stream || 'B.Tech Mechanical Engineering',
-            targetRole: extracted.targetRole || 'AI FULL-STACK WEB DEVELOPER',
-            skills: extracted.skills && extracted.skills.length > 0 ? extracted.skills : EXACT_PRAKHAR_RESUME_SKILLS,
+            targetRole: extracted.targetRole,
+            skills: extracted.skills,
             experienceYears: extracted.experienceYears || 1,
             updatedAt: new Date().toISOString(),
           };
@@ -116,7 +123,7 @@ export default function DashboardPage() {
           setCandidateProfile(newProfile);
 
           setActivityLogs(prev => [
-            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & verified resume "${file.name}" -> ${newProfile.skills.length} exact skills extracted` },
+            { time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), action: `Uploaded & extracted resume "${file.name}" -> ${newProfile.name} (${newProfile.branch})` },
             ...prev
           ]);
 
@@ -167,14 +174,14 @@ export default function DashboardPage() {
         className="hidden"
       />
 
-      {/* Top Banner Header */}
+      {/* Top Banner Header - Candidate Personal Info strictly from Resume */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-slate-800 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
         <div>
           <div className="flex items-center gap-3">
             <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
-              WELCOME BACK, {candidateProfile?.name ? candidateProfile.name.toUpperCase() : 'PRAKHAR MISHRA'} 👋
+              WELCOME BACK, {candidateProfile?.name ? candidateProfile.name.toUpperCase() : 'CANDIDATE'} 👋
             </h1>
             <span className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -182,8 +189,12 @@ export default function DashboardPage() {
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Target Role: <strong className="text-indigo-300">{candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER'}</strong> • Stream: <strong className="text-white">{candidateProfile?.stream || 'B.Tech Mechanical Engineering'}</strong>
+            Target Role: <strong className="text-indigo-300">{candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER'}</strong> • Stream: <strong className="text-white">{candidateProfile?.branch || 'Mechanical Engineering'} ({candidateProfile?.graduationYear || '2026'})</strong>
           </p>
+          <div className="flex items-center gap-4 text-xs text-slate-400 mt-2">
+            {candidateProfile?.email && <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5 text-indigo-400" /> {candidateProfile.email}</span>}
+            {candidateProfile?.phone && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5 text-emerald-400" /> {candidateProfile.phone}</span>}
+          </div>
         </div>
 
         {/* Action Controls */}
@@ -234,10 +245,10 @@ export default function DashboardPage() {
             </div>
             <div>
               <span className="font-bold text-white block">
-                Active Resume: {candidateProfile?.resumeFileName || 'Prakhar_Mishra_Resume.pdf'} ({candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER'})
+                Active Resume: {candidateProfile?.resumeFileName || 'Prakhar_Mishra_Resume.pdf'} ({candidateProfile?.targetRole})
               </span>
               <span className="text-[11px] text-slate-400">
-                {candidateSkills.length} Exact Technical Skills Extracted Directly From Resume
+                Extracted strictly from document text: {candidateSkills.length} Technical Skills
               </span>
             </div>
           </div>
@@ -253,7 +264,7 @@ export default function DashboardPage() {
 
         {/* Extracted Resume Technical Skills Display */}
         <div className="space-y-1">
-          <span className="text-[11px] font-bold text-indigo-300 block">Extracted Resume Technical Skills:</span>
+          <span className="text-[11px] font-bold text-indigo-300 block">Resume Technical Skills Extracted:</span>
           <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
             {candidateSkills.map((skill: string) => (
               <span key={skill} className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 text-[10px] font-semibold border border-indigo-800/60">
@@ -276,7 +287,7 @@ export default function DashboardPage() {
             {isLoading ? '...' : topJobs.length}
           </p>
           <p className="text-[11px] text-emerald-400 font-medium mt-1 flex items-center gap-1">
-            <TrendingUp className="w-3 h-3" /> Live from 15 connected sources
+            <TrendingUp className="w-3 h-3" /> Live count across 15 sources
           </p>
         </div>
 
