@@ -1,9 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+async function callGeminiRestAPI(apiKey: string, prompt: string) {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch (e) {
+      // Continue to next model
+    }
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { rawText } = await req.json();
+    const { rawText, userApiKey } = await req.json();
 
     if (!rawText || typeof rawText !== 'string' || rawText.trim().length === 0) {
       return NextResponse.json(
@@ -16,22 +43,10 @@ export async function POST(req: NextRequest) {
     }
 
     const text = rawText.trim();
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = userApiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
 
     if (apiKey) {
-      const candidateModels = [
-        'gemini-2.0-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash-8b',
-        'gemini-1.5-pro-latest',
-        'gemini-1.0-pro',
-      ];
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      for (const modelName of candidateModels) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const prompt = `You are an expert ATS resume parser. Analyze this uploaded document text:
+      const prompt = `You are an expert ATS resume parser. Analyze this uploaded document text:
 
 DOCUMENT TEXT:
 ${text}
@@ -54,14 +69,33 @@ Return strict JSON format ONLY:
   "experienceYears": 1
 }`;
 
+      // Try Direct REST API first for bulletproof compatibility
+      const restResponseText = await callGeminiRestAPI(apiKey, prompt);
+      if (restResponseText) {
+        try {
+          const cleanJson = restResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          return NextResponse.json(parsed);
+        } catch (e) {
+          // Fall back to SDK or backup parser
+        }
+      }
+
+      // Try SDK as secondary fallback
+      const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+      const genAI = new GoogleGenerativeAI(cleanKey);
+      const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent(prompt);
           const respText = result.response.text();
           const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
-
           return NextResponse.json(parsed);
         } catch (err: any) {
-          // Suppress 404 warnings silently
+          // Suppress error
         }
       }
     }
@@ -96,6 +130,7 @@ Return strict JSON format ONLY:
       email: 'prakharmishraflp@gmail.com',
       phone: '+91 6372843175',
       college: 'Madan Mohan Malaviya University of Technology (MMMUT)',
+      stream: 'Mechanical Engineering',
       branch: 'Mechanical Engineering',
       graduationYear: '2026 (Final Year)',
       targetRole: 'AI FULL-STACK WEB DEVELOPER',

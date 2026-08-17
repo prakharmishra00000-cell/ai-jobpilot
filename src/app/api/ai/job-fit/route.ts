@@ -1,15 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+async function callGeminiRestAPI(apiKey: string, prompt: string) {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch (e) {
+      // Continue to next model
+    }
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { job, candidateProfile } = await req.json();
+    const { job, candidateProfile, userApiKey } = await req.json();
 
     if (!job) {
       return NextResponse.json({ error: 'Missing job details' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = userApiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     const skills = candidateProfile?.skills || [
       'AI-powered applications', 'AI APIs', 'Prompt Engineering', 'AI Agent Development', 'AI product integration',
       'Frontend Development', 'Backend Development', 'APIs', 'Database Integration', 'Authentication', 'Next.js', 'React',
@@ -19,13 +46,7 @@ export async function POST(req: NextRequest) {
     const candidateRole = candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER';
 
     if (apiKey) {
-      const candidateModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      for (const modelName of candidateModels) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const prompt = `You are an expert AI Career Coach. Evaluate job fit:
+      const prompt = `You are an expert AI Career Coach. Evaluate job fit:
 
 CANDIDATE:
 - Role: ${candidateRole}
@@ -47,14 +68,33 @@ Return strict JSON format ONLY:
   "applicationQA": [{ "q": "Why join?", "a": "My background in..." }]
 }`;
 
+      // Direct REST API call
+      const restResponseText = await callGeminiRestAPI(apiKey, prompt);
+      if (restResponseText) {
+        try {
+          const cleanJson = restResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
+          return NextResponse.json(parsed);
+        } catch (e) {
+          // Fall through
+        }
+      }
+
+      // SDK Fallback
+      const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+      const genAI = new GoogleGenerativeAI(cleanKey);
+      const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
           const result = await model.generateContent(prompt);
           const respText = result.response.text();
           const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
-
           return NextResponse.json(parsed);
         } catch (err: any) {
-          console.warn(`Gemini model ${modelName} Job Fit warning:`, err?.message || err);
+          // Suppress
         }
       }
     }

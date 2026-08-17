@@ -2,11 +2,38 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { allSourcesAdapter } from '@/adapters/all_sources';
 
+async function callGeminiRestAPI(apiKey: string, prompt: string) {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.0-pro'];
+
+  for (const modelName of modelsToTry) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+      }
+    } catch (e) {
+      // Continue to next model
+    }
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { candidateProfile } = await req.json();
+    const { candidateProfile, userApiKey } = await req.json();
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = userApiKey || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     const role = candidateProfile?.targetRole || 'AI FULL-STACK WEB DEVELOPER';
     const skills = candidateProfile?.skills || [
       'AI-powered applications', 'AI APIs', 'Prompt Engineering', 'AI Agent Development', 'AI product integration',
@@ -22,20 +49,7 @@ export async function POST(req: NextRequest) {
     ];
 
     if (apiKey) {
-      // Model names compatible with AQ / Vertex / Google AI Studio keys
-      const candidateModels = [
-        'gemini-2.0-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-flash-8b',
-        'gemini-1.5-pro-latest',
-        'gemini-1.0-pro',
-      ];
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      for (const modelName of candidateModels) {
-        try {
-          const model = genAI.getGenerativeModel({ model: modelName });
-          const prompt = `You are an AI job discovery engine. Generate 3-4 targeted search query titles matching this candidate:
+      const prompt = `You are an AI job discovery engine. Generate 3-4 targeted search query titles matching this candidate:
 
 Candidate Role: ${role}
 Candidate Skills: ${skills.join(', ')}
@@ -45,17 +59,39 @@ Return strict JSON format ONLY:
   "queries": ["Senior AI Full-Stack Developer", "AI Agent Engineer", "Next.js & React AI Developer"]
 }`;
 
-          const result = await model.generateContent(prompt);
-          const respText = result.response.text();
-          const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+      // Direct REST API call
+      const restResponseText = await callGeminiRestAPI(apiKey, prompt);
+      if (restResponseText) {
+        try {
+          const cleanJson = restResponseText.replace(/```json/g, '').replace(/```/g, '').trim();
           const parsed = JSON.parse(cleanJson);
-
           if (parsed.queries && Array.isArray(parsed.queries) && parsed.queries.length > 0) {
             searchQueries = parsed.queries;
-            break;
           }
-        } catch (err: any) {
-          // Suppress 404 warnings silently and try next model
+        } catch (e) {
+          // Fall through
+        }
+      } else {
+        // SDK Fallback
+        const cleanKey = apiKey.trim().replace(/^["']|["']$/g, '');
+        const genAI = new GoogleGenerativeAI(cleanKey);
+        const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+
+        for (const modelName of candidateModels) {
+          try {
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            const respText = result.response.text();
+            const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const parsed = JSON.parse(cleanJson);
+
+            if (parsed.queries && Array.isArray(parsed.queries) && parsed.queries.length > 0) {
+              searchQueries = parsed.queries;
+              break;
+            }
+          } catch (err: any) {
+            // Suppress
+          }
         }
       }
     }
