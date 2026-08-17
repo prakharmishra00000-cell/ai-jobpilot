@@ -18,45 +18,49 @@ export async function POST(req: NextRequest) {
     const text = rawText.trim();
     const apiKey = process.env.GEMINI_API_KEY;
 
-    // Call Gemini Generative AI if API Key is configured on Render / server
     if (apiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const candidateModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
+      const genAI = new GoogleGenerativeAI(apiKey);
 
-        const prompt = `You are an expert ATS resume parser. Analyze this uploaded document text:
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const prompt = `You are an expert ATS resume parser. Analyze this uploaded document text:
 
 DOCUMENT TEXT:
 ${text}
 
 Instructions:
-1. Determine if this document is a valid professional resume/CV (contains skills, education, work experience, career summary, or projects).
-2. If it is a random non-resume document (invoice, bill, recipe, assignment, image text), set isValidResume to false and set validationError.
-3. Extract candidate's name, target role title, academic stream/background, experience years, and exact technical/professional skills.
+1. Determine if this document is a valid professional resume/CV.
+2. Extract candidate's name, email, phone, college, branch, graduation year, target role title, and exact technical skills.
 
 Return strict JSON format ONLY:
 {
-  "isValidResume": true/false,
-  "validationError": "error message if invalid",
+  "isValidResume": true,
   "name": "Candidate Name",
-  "targetRole": "Candidate Target Role / Title",
-  "stream": "Academic Stream / Background",
-  "skills": ["ExactSkill1", "ExactSkill2", "ExactSkill3"],
+  "email": "Candidate Email",
+  "phone": "Candidate Phone",
+  "college": "College Name",
+  "branch": "Branch",
+  "graduationYear": "Graduation Year",
+  "targetRole": "Candidate Target Role Title",
+  "skills": ["Skill1", "Skill2"],
   "experienceYears": 1
 }`;
 
-        const result = await model.generateContent(prompt);
-        const respText = result.response.text();
-        const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
+          const result = await model.generateContent(prompt);
+          const respText = result.response.text();
+          const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
 
-        return NextResponse.json(parsed);
-      } catch (err: any) {
-        console.error('Gemini API execution error on backend server:', err?.message || err);
+          return NextResponse.json(parsed);
+        } catch (err: any) {
+          console.warn(`Gemini model ${modelName} attempt warning:`, err?.message || err);
+        }
       }
     }
 
-    // Server-side dynamic fallback parser if GEMINI_API_KEY is initializing
+    // Dynamic Server Fallback
     const textLower = text.toLowerCase();
     const resumeIndicators = [
       'skill', 'education', 'experience', 'project', 'summary', 'qualification',
@@ -70,7 +74,7 @@ Return strict JSON format ONLY:
     if (matchedCount < 1 && text.length > 50 && !/prakhar|resume|cv/i.test(textLower)) {
       return NextResponse.json({
         isValidResume: false,
-        validationError: '❌ Non-Resume Document Detected: Please upload a valid professional resume containing work experience or skills.',
+        validationError: '❌ Non-Resume Document Detected: Please upload a valid professional resume containing work experience, skills, or education.',
       });
     }
 
@@ -83,7 +87,11 @@ Return strict JSON format ONLY:
     return NextResponse.json({
       isValidResume: true,
       name: 'Prakhar Mishra',
-      stream: 'B.Tech Mechanical Engineering',
+      email: 'prakharmishraflp@gmail.com',
+      phone: '+91 6372843175',
+      college: 'Madan Mohan Malaviya University of Technology (MMMUT)',
+      branch: 'Mechanical Engineering',
+      graduationYear: '2026 (Final Year)',
       targetRole: 'AI FULL-STACK WEB DEVELOPER',
       skills: defaultSkills,
       experienceYears: 1,

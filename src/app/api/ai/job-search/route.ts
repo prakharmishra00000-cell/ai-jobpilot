@@ -22,37 +22,39 @@ export async function POST(req: NextRequest) {
     ];
 
     if (apiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const candidateModels = ['gemini-1.5-flash-latest', 'gemini-1.5-pro', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'];
+      const genAI = new GoogleGenerativeAI(apiKey);
 
-        const prompt = `You are an AI job discovery engine. Generate 3-4 targeted search query titles matching this candidate's EXACT resume:
+      for (const modelName of candidateModels) {
+        try {
+          const model = genAI.getGenerativeModel({ model: modelName });
+          const prompt = `You are an AI job discovery engine. Generate 3-4 targeted search query titles matching this candidate:
 
 Candidate Role: ${role}
 Candidate Skills: ${skills.join(', ')}
 
 Return strict JSON format ONLY:
 {
-  "queries": ["Senior AI Full-Stack Developer", "AI Agent & Product Integration Engineer", "Next.js & React AI Developer"]
+  "queries": ["Senior AI Full-Stack Developer", "AI Agent Engineer", "Next.js & React AI Developer"]
 }`;
 
-        const result = await model.generateContent(prompt);
-        const respText = result.response.text();
-        const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleanJson);
+          const result = await model.generateContent(prompt);
+          const respText = result.response.text();
+          const cleanJson = respText.replace(/```json/g, '').replace(/```/g, '').trim();
+          const parsed = JSON.parse(cleanJson);
 
-        if (parsed.queries && Array.isArray(parsed.queries) && parsed.queries.length > 0) {
-          searchQueries = parsed.queries;
+          if (parsed.queries && Array.isArray(parsed.queries) && parsed.queries.length > 0) {
+            searchQueries = parsed.queries;
+            break;
+          }
+        } catch (err: any) {
+          console.warn(`Gemini search model ${modelName} warning:`, err?.message || err);
         }
-      } catch (err: any) {
-        console.warn('Gemini query generation warning:', err?.message || err);
       }
     }
 
-    // Fetch all exact matched jobs
     const fetchedJobs = await allSourcesAdapter.fetchJobs(role);
 
-    // Score jobs against candidate's exact resume skills
     const scoredJobs = fetchedJobs.map((job) => {
       const descLower = (job.description || '').toLowerCase();
       const titleLower = (job.title || '').toLowerCase();
