@@ -10,9 +10,10 @@ import {
   ShieldCheck,
   RefreshCw,
   Trash2,
+  Zap,
 } from 'lucide-react';
 import { jobSourceRegistry } from '@/adapters/registry';
-import { analyzeLiveJobFit } from '@/services/ai/gemini';
+import { analyzeLiveJobFit, EXACT_PRAKHAR_RESUME_SKILLS } from '@/services/ai/gemini';
 
 interface ApplicationItem {
   id: string;
@@ -34,65 +35,69 @@ export default function ApplicationsPage() {
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadLiveApplications = async () => {
+  const syncLiveJobsIntoCRM = async () => {
     setIsLoading(true);
     try {
-      // CLEAR old cached mock items that had fake 'Applied' statuses
-      const saved = localStorage.getItem('jobpilot_applications');
-      if (saved) {
-        const parsed: ApplicationItem[] = JSON.parse(saved);
-        // Filter out old fake items that claimed 'Applied' without user action
-        const cleanSaved = parsed.filter(a => a.isUserSubmitted || a.status === 'Ready to Apply (Direct Link Active)');
-        if (cleanSaved.length > 0) {
-          setApplications(cleanSaved);
-          setIsLoading(false);
-          return;
-        }
-      }
+      const candidateProfile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || 'null') || {
+        targetRole: 'AI FULL-STACK WEB DEVELOPER',
+        skills: EXACT_PRAKHAR_RESUME_SKILLS,
+        experienceYears: 1,
+        branch: 'Mechanical Engineering',
+        graduationYear: '2026',
+      };
 
-      // READ CANDIDATE PROFILE FOR REAL-TIME DYNAMIC FIT SCORING
-      const candidateProfile = JSON.parse(localStorage.getItem('jobpilot_candidate_profile') || '{}');
-      const candidateSkills = candidateProfile.skills || ['React', 'Next.js', 'TypeScript', 'Node.js', 'AI APIs'];
+      const candidateSkills = candidateProfile.skills || EXACT_PRAKHAR_RESUME_SKILLS;
       const candidateYears = candidateProfile.experienceYears || 1;
-      const roleQuery = candidateProfile.targetRole || 'Software Developer';
+      const roleQuery = candidateProfile.targetRole || 'AI FULL-STACK WEB DEVELOPER';
       
       const liveJobs = await jobSourceRegistry.searchAllSources({ role: roleQuery });
 
-      const defaultLiveApps: ApplicationItem[] = liveJobs.slice(0, 12).map((job, idx) => {
-        const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears);
+      // Read existing saved user applications
+      const saved = localStorage.getItem('jobpilot_applications');
+      const existingApps: ApplicationItem[] = saved ? JSON.parse(saved) : [];
+      const existingIds = new Set(existingApps.map(a => a.id));
 
-        return {
-          id: `live-app-${job.id || idx}`,
-          jobTitle: job.title,
-          company: job.company,
-          platform: job.source,
-          fitScore: liveFit.fitScore,
-          shortlistProb: liveFit.shortlistProbability,
-          appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-          status: 'Ready to Apply (Direct Link Active)',
-          responseStatus: 'Awaiting Candidate Action',
-          mode: '24/7 Live Engine',
-          originalUrl: job.originalUrl || job.applicationUrl,
-          isUserSubmitted: false,
-        };
+      const newDiscoveredApps: ApplicationItem[] = [];
+
+      liveJobs.forEach((job, idx) => {
+        const appId = `live-crm-${job.id || idx}`;
+        if (!existingIds.has(appId)) {
+          const liveFit = analyzeLiveJobFit(job, candidateSkills, candidateYears, roleQuery, candidateProfile.branch, candidateProfile.graduationYear);
+
+          newDiscoveredApps.push({
+            id: appId,
+            jobTitle: job.title,
+            company: job.company,
+            platform: job.source,
+            fitScore: liveFit.fitScore,
+            shortlistProb: liveFit.shortlistProbability,
+            appliedAt: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+            status: 'Ready to Apply (Direct Link Active)',
+            responseStatus: 'Awaiting Candidate Action',
+            mode: '24/7 Engine Live Sync',
+            originalUrl: job.originalUrl || job.applicationUrl,
+            isUserSubmitted: false,
+          });
+        }
       });
 
-      setApplications(defaultLiveApps);
-      localStorage.setItem('jobpilot_applications', JSON.stringify(defaultLiveApps));
+      const updatedCombinedApps = [...newDiscoveredApps, ...existingApps];
+      setApplications(updatedCombinedApps);
+      localStorage.setItem('jobpilot_applications', JSON.stringify(updatedCombinedApps));
     } catch (err) {
-      console.error('Error loading live CRM applications:', err);
+      console.error('Error syncing live jobs into CRM:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadLiveApplications();
+    syncLiveJobsIntoCRM();
   }, []);
 
   const handleClearCache = () => {
     localStorage.removeItem('jobpilot_applications');
-    loadLiveApplications();
+    syncLiveJobsIntoCRM();
   };
 
   const getStatusBadgeClass = (status: string) => {
@@ -117,21 +122,32 @@ export default function ApplicationsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-            Applications CRM & Direct Link Verification <FileCheck className="w-5 h-5 text-indigo-400" />
+            Applications CRM & 24/7 Engine Sync <Zap className="w-5 h-5 text-emerald-400 animate-pulse" />
           </h1>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time tracked jobs from 15 connected platforms with direct official verification links.
+            24/7 Automation Engine automatically syncs newly discovered live jobs across 15 connected sources into your CRM.
           </p>
         </div>
 
-        <button
-          onClick={handleClearCache}
-          className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700/60 self-start sm:self-auto"
-          title="Reset cached CRM data and reload fresh live jobs"
-        >
-          <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-          <span>Reset CRM Data</span>
-        </button>
+        <div className="flex items-center gap-3 self-start sm:self-auto">
+          <button
+            onClick={syncLiveJobsIntoCRM}
+            disabled={isLoading}
+            className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/30 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <span>Sync Live Jobs Now</span>
+          </button>
+
+          <button
+            onClick={handleClearCache}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition-colors border border-slate-700/60"
+            title="Reset cached CRM data and reload fresh live jobs"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+            <span>Reset CRM</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -150,15 +166,15 @@ export default function ApplicationsPage() {
           </select>
         </div>
 
-        <span className="text-xs text-slate-400 flex items-center gap-1">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Live Verification Links Active
+        <span className="text-xs text-emerald-400 flex items-center gap-1 font-semibold">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> 24/7 Engine Live Updating CRM ({applications.length} Openings Tracked)
         </span>
       </div>
 
       {/* Applications Table */}
       {isLoading ? (
         <div className="py-16 text-center text-xs text-slate-400 flex items-center justify-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-xl">
-          <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Fetching live jobs across 15 sources and populating CRM...
+          <RefreshCw className="w-4 h-4 animate-spin text-indigo-400" /> Querying 15 job platforms and syncing live jobs into CRM...
         </div>
       ) : (
         <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-xl">
